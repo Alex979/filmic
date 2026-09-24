@@ -5,11 +5,17 @@
  * from here; anything not exported is an internal detail we're free to change.
  */
 
-export { createFilm } from "./film";
-export type { Film, FilmOptions } from "./film";
+export { createFilm } from "./createFilm";
+export type { Film, FilmOptions } from "./createFilm";
 
 export { shaderSource } from "./source";
-export type { Source, SourceInstance, View, SetUniforms } from "./source";
+export type {
+  Source,
+  SourceInstance,
+  SourceFrame,
+  View,
+  SetUniforms,
+} from "./source";
 
 export {
   horizonGradient,

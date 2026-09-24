@@ -1,3 +1,4 @@
+import { createFilmPass } from "./film/filmPass";
 import type { Source, View } from "./source";
 import { testPattern } from "./sources/testPattern";
 
@@ -39,6 +40,7 @@ export function createFilm(
   if (!gl) throw new Error("filmic: WebGL2 is not available");
 
   const source = (options.source ?? testPattern()).create(gl);
+  const filmPass = createFilmPass(gl);
 
   const view: View = {
     width: 0,
@@ -55,9 +57,14 @@ export function createFilm(
   const draw = () => {
     frame = 0;
     if (!view.width || !view.height) return;
+
+    // Pass 1: the source renders the scene into a texture.
+    const sourceFrame = source.render(view);
+
+    // Pass 2: the film pass reads that texture and draws to the screen.
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, view.bufferWidth, view.bufferHeight);
-    source.draw(view);
+    filmPass.draw(sourceFrame, view);
   };
 
   const render = () => {
@@ -106,6 +113,7 @@ export function createFilm(
       cancelAnimationFrame(frame);
       observer.disconnect();
       source.dispose();
+      filmPass.dispose();
       // The context itself belongs to the canvas and is left alone, so the
       // same canvas can be handed to createFilm again (e.g. React remounts).
     },

@@ -28,7 +28,7 @@ bun lint
 - [x] Project setup
 - [x] WebGL groundwork: canvas, resize/DPR, full-screen pass, render loop
 - [x] Sources: `shaderSource`, procedural horizon gradient
-- [ ] Two-pass pipeline: source -> texture -> film pass
+- [x] Two-pass pipeline: source -> texture -> film pass
 - [ ] Grain: procedural, brightness-dependent
 - [ ] Mottle: low-frequency blotches
 - [ ] Look: tone curve, halation, softness, vignette

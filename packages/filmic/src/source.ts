@@ -1,4 +1,5 @@
 import { createProgram, FULLSCREEN_VERT, type Uniforms } from "./core/gl";
+import { createRenderTarget } from "./core/target";
 
 /** Size information for the frame being drawn. */
 export interface View {
@@ -23,10 +24,26 @@ export interface Source {
 }
 
 export interface SourceInstance {
-  /** Draw the scene into the currently bound framebuffer, covering all of it. */
-  draw(view: View): void;
+  /** Produce the current frame of the scene as a texture. */
+  render(view: View): SourceFrame;
   /** Release GPU resources. */
   dispose(): void;
+}
+
+/**
+ * One frame of a source: a texture, and how it lines up with the screen.
+ *
+ * The film pass works in screen UV: (0, 0) is the bottom-left of the canvas and
+ * (1, 1) the top-right (WebGL's convention). It samples the texture at
+ * `screenUv * uvScale + uvOffset`, which lets a source flip, crop or letterbox
+ * its texture without an extra pass: a texture rendered by filmic at canvas
+ * size uses scale (1, 1) and offset (0, 0); an uploaded image, whose first row
+ * is its top, flips y with scale (1, -1) and offset (0, 1).
+ */
+export interface SourceFrame {
+  texture: WebGLTexture;
+  uvScale: [number, number];
+  uvOffset: [number, number];
 }
 
 /**
@@ -67,6 +84,9 @@ export type SetUniforms = (
  * (uResolution, uPixelRatio, filmPx(), linearToSrgb(), fragColor) and writes
  * sRGB colors to `fragColor`. `setUniforms` runs before each draw to pass in
  * any extra uniforms the shader declares.
+ *
+ * It renders into its own texture at canvas resolution, which the film pass
+ * then reads.
  */
 export function shaderSource(frag: string, setUniforms?: SetUniforms): Source {
   return {
@@ -76,8 +96,11 @@ export function shaderSource(frag: string, setUniforms?: SetUniforms): Source {
         FULLSCREEN_VERT,
         SOURCE_HEADER + frag,
       );
+      const target = createRenderTarget(gl);
       return {
-        draw(view) {
+        render(view) {
+          target.resize(view.bufferWidth, view.bufferHeight);
+          target.bind();
           gl.useProgram(program);
           gl.uniform2f(uniforms.uResolution, view.width, view.height);
           gl.uniform2f(
@@ -88,9 +111,11 @@ export function shaderSource(frag: string, setUniforms?: SetUniforms): Source {
           gl.uniform1f(uniforms.uPixelRatio, view.pixelRatio);
           setUniforms?.(gl, uniforms, view);
           gl.drawArrays(gl.TRIANGLES, 0, 3);
+          return { texture: target.texture, uvScale: [1, 1], uvOffset: [0, 0] };
         },
         dispose() {
           gl.deleteProgram(program);
+          target.dispose();
         },
       };
     },
