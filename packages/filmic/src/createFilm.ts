@@ -1,10 +1,25 @@
-import { createFilmPass } from "./film/filmPass";
+import { createFilmPass, type FilmSettings } from "./film/filmPass";
+import { DEFAULT_FRAME, type FrameOptions } from "./film/frame";
+import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
+import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
 import type { Source, View } from "./source";
 import { testPattern } from "./sources/testPattern";
 
-export interface FilmOptions {
-  /** What to film. Default: a test pattern. */
+/**
+ * Settings that can be changed at any time with `film.set()`. Each group is
+ * merged into the current settings; omitted fields keep their value.
+ */
+export interface FilmUpdate {
+  /** What to film. */
   source?: Source;
+  /** How the film frame is laid over the canvas. */
+  frame?: Partial<FrameOptions>;
+  /** Lens and emulsion softness. */
+  optics?: Partial<OpticsOptions>;
+  grain?: Partial<GrainOptions>;
+}
+
+export interface FilmOptions extends FilmUpdate {
   /**
    * Upper limit on the canvas's pixel ratio. On a 3x phone screen, rendering at
    * 2x is visually identical for grainy film and costs ~45% fewer pixels.
@@ -14,6 +29,10 @@ export interface FilmOptions {
 }
 
 export interface Film {
+  /** Change settings or the source; redraws on the next frame. */
+  set(update: FilmUpdate): void;
+  /** The current effect settings (read-only snapshot). */
+  readonly settings: Readonly<FilmSettings>;
   /** Schedule a redraw on the next animation frame. */
   render(): void;
   /** Stop rendering and release GPU resources. */
@@ -39,8 +58,13 @@ export function createFilm(
   });
   if (!gl) throw new Error("filmic: WebGL2 is not available");
 
-  const source = (options.source ?? testPattern()).create(gl);
+  let source = (options.source ?? testPattern()).create(gl);
   const filmPass = createFilmPass(gl);
+  const settings: FilmSettings = {
+    frame: { ...DEFAULT_FRAME, ...options.frame },
+    optics: { ...DEFAULT_OPTICS, ...options.optics },
+    grain: { ...DEFAULT_GRAIN, ...options.grain },
+  };
 
   const view: View = {
     width: 0,
@@ -62,9 +86,7 @@ export function createFilm(
     const sourceFrame = source.render(view);
 
     // Pass 2: the film pass reads that texture and draws to the screen.
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, view.bufferWidth, view.bufferHeight);
-    filmPass.draw(sourceFrame, view);
+    filmPass.draw(sourceFrame, view, settings);
   };
 
   const render = () => {
@@ -107,6 +129,30 @@ export function createFilm(
   }
 
   return {
+    set(update) {
+      if (destroyed) return;
+      if (update.source) {
+        source.dispose();
+        source = update.source.create(gl);
+      }
+      if (update.frame) settings.frame = { ...settings.frame, ...update.frame };
+      if (update.optics)
+        settings.optics = { ...settings.optics, ...update.optics };
+      if (update.grain) settings.grain = { ...settings.grain, ...update.grain };
+      render();
+    },
+    get settings(): FilmSettings {
+      // A copy, so callers can't change settings without going through set().
+      // (Shallow per group: frame.fit may be a function, which can't be cloned.)
+      return {
+        frame: {
+          ...settings.frame,
+          anchor: [settings.frame.anchor[0], settings.frame.anchor[1]],
+        },
+        optics: { ...settings.optics },
+        grain: { ...settings.grain },
+      };
+    },
     render,
     destroy() {
       destroyed = true;

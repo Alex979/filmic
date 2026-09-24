@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { createFilm, horizonGradient } from "filmic";
+import { createControls } from "./controls";
 
-/** A full-bleed canvas driven by filmic. */
+/** A full-bleed canvas driven by filmic, with a tuning panel. */
 export function FilmCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -9,7 +10,11 @@ export function FilmCanvas() {
     const film = createFilm(canvasRef.current!, {
       source: horizonGradient(),
     });
-    return () => film.destroy();
+    const controls = createControls(film);
+    return () => {
+      controls.destroy();
+      film.destroy();
+    };
   }, []);
 
   return <canvas ref={canvasRef} className="film" />;

@@ -22,15 +22,16 @@ export interface HorizonGradientOptions {
 }
 
 export const DEFAULT_HORIZON_STOPS: HorizonStop[] = [
-  // the planet: near-black, warming to a dim ember right under the rim
-  [-1.0, "#0b0a09"],
+  // the planet: near-black, with the glow bleeding a little way past the rim
   [-0.25, "#110e0d"],
   [-0.06, "#1b1411"],
-  [-0.012, "#2c1712"],
-  [-0.002, "#57211a"],
-  // the glow: a thin red rim, then orange, peach, dusty lavender
-  [0.0, "#c4452b"],
-  [0.012, "#df6630"],
+  [-0.015, "#3a1d15"],
+  [-0.008, "#52251b"],
+  [-0.003, "#763020"],
+  // the glow: a soft red rim, then orange, peach, dusty lavender
+  [0.0, "#9e3c26"],
+  [0.006, "#c4522b"],
+  [0.016, "#d9632f"],
   [0.035, "#ea8f48"],
   [0.07, "#e3ae7c"],
   [0.12, "#b09aa6"],
@@ -39,8 +40,7 @@ export const DEFAULT_HORIZON_STOPS: HorizonStop[] = [
   [0.32, "#5583bd"],
   [0.42, "#34598c"],
   [0.55, "#182a47"],
-  [0.8, "#0e1627"],
-  [1.2, "#0a0d16"],
+  [1.2, "#0b1020"],
 ];
 
 const MAX_STOPS = 16;

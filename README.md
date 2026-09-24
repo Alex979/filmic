@@ -29,9 +29,13 @@ bun lint
 - [x] WebGL groundwork: canvas, resize/DPR, full-screen pass, render loop
 - [x] Sources: `shaderSource`, procedural horizon gradient
 - [x] Two-pass pipeline: source -> texture -> film pass
-- [ ] Grain: procedural, brightness-dependent
+- [x] Film frame: effects anchored to the image (cover/contain/fill/screen/custom)
+- [x] Grain: procedural, brightness-dependent, with edge breakup
+- [x] Optics: lens/emulsion blur (separable gaussian)
+- [x] Live settings: `film.set()`
+- [ ] `elementSource`: film any canvas (2D, p5, Pixi, Three…), video or image
 - [ ] Mottle: low-frequency blotches
-- [ ] Look: tone curve, halation, softness, vignette
+- [ ] Look: tone curve, halation, vignette
 - [ ] Dust: procedural specks and hairs
 - [ ] Title: curved text (SVG overlay, or drawn into the source)
 - [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust

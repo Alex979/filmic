@@ -6,7 +6,15 @@
  */
 
 export { createFilm } from "./createFilm";
-export type { Film, FilmOptions } from "./createFilm";
+export type { Film, FilmOptions, FilmUpdate } from "./createFilm";
+export type { FilmSettings } from "./film/filmPass";
+
+export { DEFAULT_FRAME, resolveFrame } from "./film/frame";
+export type { FrameOptions, FrameFit, Rect } from "./film/frame";
+export { DEFAULT_OPTICS } from "./film/optics";
+export type { OpticsOptions } from "./film/optics";
+export { DEFAULT_GRAIN } from "./film/grain";
+export type { GrainOptions } from "./film/grain";
 
 export { shaderSource } from "./source";
 export type {
