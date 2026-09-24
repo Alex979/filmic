@@ -1,9 +1,9 @@
-import { VERSION } from "filmic";
+import { FilmCanvas } from "./FilmCanvas";
 
 export default function App() {
   return (
     <main className="stage">
-      <h1 className="placeholder">filmic {VERSION}</h1>
+      <FilmCanvas />
     </main>
   );
 }

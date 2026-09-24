@@ -5,4 +5,5 @@
  * from here; anything not exported is an internal detail we're free to change.
  */
 
-export const VERSION = "0.0.0";
+export { createFilm } from "./film";
+export type { Film, FilmOptions } from "./film";
