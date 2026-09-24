@@ -7,3 +7,18 @@
 
 export { createFilm } from "./film";
 export type { Film, FilmOptions } from "./film";
+
+export { shaderSource } from "./source";
+export type { Source, SourceInstance, View, SetUniforms } from "./source";
+
+export {
+  horizonGradient,
+  horizonCircle,
+  DEFAULT_HORIZON_STOPS,
+} from "./sources/horizonGradient";
+export type {
+  HorizonGradientOptions,
+  HorizonStop,
+  Circle,
+} from "./sources/horizonGradient";
+export { testPattern } from "./sources/testPattern";

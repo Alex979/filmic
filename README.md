@@ -26,8 +26,8 @@ bun lint
 ## Roadmap
 
 - [x] Project setup
-- [ ] WebGL groundwork: canvas, resize/DPR, full-screen quad, render loop
-- [ ] Source: procedural horizon gradient
+- [x] WebGL groundwork: canvas, resize/DPR, full-screen pass, render loop
+- [x] Sources: `shaderSource`, procedural horizon gradient
 - [ ] Two-pass pipeline: source -> texture -> film pass
 - [ ] Grain: procedural, brightness-dependent
 - [ ] Mottle: low-frequency blotches
@@ -36,3 +36,4 @@ bun lint
 - [ ] Title: curved text (SVG overlay, or drawn into the source)
 - [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust
 - [ ] Controls panel
+- [ ] Horizon source: cloud-like variation in the sky
