@@ -52,7 +52,14 @@ export function attachElement(
 ) {
   const style = element.style;
   const inks = options.ink ? [options.ink].flat() : [];
+  // The frame the element is posed for, and the shift that pose applied.
+  let posed = -1;
+  let dx = 0;
+  let dy = 0;
   const reset = () => {
+    if (posed < 0) return;
+    posed = -1;
+    dx = dy = 0;
     style.transform = "";
     style.transformOrigin = "";
     style.filter = "";
@@ -61,11 +68,19 @@ export function attachElement(
 
   const off = subscribe((f) => {
     if (!f.playing) return reset();
+    // Draws between footage frames (e.g. on scroll) change nothing here, and
+    // touching the styles anyway would make the browser redraw the element.
+    if (f.n === posed) return;
+    posed = f.n;
     // The rotation center is the film frame's, wherever the element sits.
+    // The element's box includes the shift it was given last frame; the
+    // rotation's effect on it is too small to matter.
     const c = canvas.getBoundingClientRect();
     const e = element.getBoundingClientRect();
-    const ox = c.left + f.origin[0] - e.left;
-    const oy = c.top + f.origin[1] - e.top;
+    const ox = c.left + f.origin[0] - (e.left - dx);
+    const oy = c.top + f.origin[1] - (e.top - dy);
+    dx = f.dx;
+    dy = f.dy;
     style.transformOrigin = `${ox.toFixed(2)}px ${oy.toFixed(2)}px`;
     style.transform = `translate(${f.dx.toFixed(3)}px, ${f.dy.toFixed(3)}px) rotate(${f.rotation.toFixed(6)}rad)`;
     style.filter = `brightness(${f.brightness.toFixed(4)})`;
