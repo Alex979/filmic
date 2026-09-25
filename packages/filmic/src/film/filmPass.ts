@@ -17,11 +17,17 @@ import {
   type MottleOptions,
 } from "./mottle";
 import { createOptics, type OpticsOptions } from "./optics";
+import {
+  createHalation,
+  HALATION_GLSL,
+  type HalationOptions,
+} from "./halation";
 
 /** Every film setting, fully resolved (no missing fields). */
 export interface FilmSettings {
   frame: FrameOptions;
   optics: OpticsOptions;
+  halation: HalationOptions;
   mottle: MottleOptions;
   grain: GrainOptions;
   dust: DustOptions;
@@ -58,6 +64,7 @@ vec2 filmToUv(vec2 d) {
   return d / uFilmScale * uPixelRatio / uBufferSize * vec2(1., -1.);
 }
 
+${HALATION_GLSL}
 ${GRAIN_GLSL}
 ${MOTTLE_GLSL}
 ${DUST_GLSL}
@@ -81,13 +88,15 @@ void main() {
   // 1. Emulsion: sample the (already optically softened) image through
   //    grain-driven offsets, so edges break up into grain.
   vec3 c = sampleSource(onFilm + filmToUv(grainBreakup(filmPx)));
-  // 2. Flicker: this frame's exposure.
+  // 2. Halation: highlights glow through the film base.
+  c = applyHalation(c, onFilm);
+  // 3. Flicker: this frame's exposure.
   c *= uExposure;
-  // 3. Mottle: faint, soft blotches of density and color.
+  // 4. Mottle: faint, soft blotches of density and color.
   c = applyMottle(c, filmPx);
-  // 4. Grain on top, strongest in the mid-tones.
+  // 5. Grain on top, strongest in the mid-tones.
   c = applyGrain(c, filmPx);
-  // 5. Dust sits on the film, in front of the grain.
+  // 6. Dust sits on the film, in front of the grain.
   c = applyDust(c, onFilm);
 
   fragColor = vec4(clamp(c, 0., 1.), 1.);
@@ -117,19 +126,30 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
   const mottleTexture = createMottleTexture(gl);
   const dust = createDust(gl);
   const opticsPasses = createOptics(gl);
+  const halation = createHalation(gl);
 
   return {
     draw(
       sourceFrame,
       view,
-      { frame: frameOptions, optics, mottle, grain, dust: dustOptions, footage },
+      {
+        frame: frameOptions,
+        optics,
+        halation: halationOptions,
+        mottle,
+        grain,
+        dust: dustOptions,
+        footage,
+      },
       current,
     ) {
       const film = resolveFrame(view, frameOptions, sourceFrame.rect);
 
       // Passes that render into textures come first, before targeting the screen:
-      // the optical blur, dust, and regenerating noise if its settings changed.
+      // the optical blur, halation, dust, and regenerating noise if its
+      // settings changed.
       const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
+      const halo = halation.render(frame, view, halationOptions, film.scale);
       grainTexture.update(grain.seed, grain.softness, grain.sharpness);
       mottleTexture.update(mottle.seed);
       const dustTexture = dust.render(view, film, dustOptions, footage, current.n);
@@ -192,6 +212,8 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
       gl.uniform1i(u.uDust, 3);
       gl.uniform1f(u.uDustAmount, dustOptions.amount);
 
+      halation.bind(u, halo, halationOptions, 4);
+
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       return film;
     },
@@ -201,6 +223,7 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
       mottleTexture.dispose();
       dust.dispose();
       opticsPasses.dispose();
+      halation.dispose();
     },
   };
 }

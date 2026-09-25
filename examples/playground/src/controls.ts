@@ -4,6 +4,7 @@ import {
   DEFAULT_FOOTAGE,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
+  DEFAULT_HALATION,
   DEFAULT_MOTTLE,
   DEFAULT_OPTICS,
   type FrameFit,
@@ -36,6 +37,22 @@ export function createControls(): GUI {
     .add(optics, "blur", 0, 6, 0.05)
     .name("blur (film px)")
     .onChange(applyOptics);
+
+  // --- Halation ---
+  const halation = { ...DEFAULT_HALATION };
+  const halationState = { on: true };
+  const applyHalation = () =>
+    setAll({
+      halation: { ...halation, amount: halationState.on ? halation.amount : 0 },
+    });
+  const h = gui.addFolder("Halation");
+  h.add(halationState, "on").name("enabled").onChange(applyHalation);
+  h.add(halation, "amount", 0, 3, 0.01).onChange(applyHalation);
+  h.add(halation, "threshold", 0, 1, 0.01).onChange(applyHalation);
+  h.add(halation, "radius", 1, 80, 0.5)
+    .name("radius (film px)")
+    .onChange(applyHalation);
+  h.addColor(halation, "color").onChange(applyHalation);
 
   // --- Mottle ---
   const mottle = { ...DEFAULT_MOTTLE };
@@ -116,6 +133,8 @@ export function createControls(): GUI {
             resolution: DEFAULT_FRAME.resolution,
           });
           Object.assign(optics, DEFAULT_OPTICS);
+          Object.assign(halation, DEFAULT_HALATION);
+          halationState.on = true;
           Object.assign(mottle, DEFAULT_MOTTLE);
           mottleState.on = true;
           Object.assign(grain, DEFAULT_GRAIN);
@@ -125,6 +144,7 @@ export function createControls(): GUI {
           gui.controllersRecursive().forEach((c) => c.updateDisplay());
           applyFrame();
           applyOptics();
+          applyHalation();
           applyMottle();
           applyGrain();
           applyDust();

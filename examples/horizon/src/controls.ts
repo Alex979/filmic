@@ -1,9 +1,11 @@
 import GUI from "lil-gui";
+import { HORIZON_FILM, HORIZON_INK } from "./look";
 import {
   DEFAULT_DUST,
   DEFAULT_FOOTAGE,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
+  DEFAULT_HALATION,
   DEFAULT_INK,
   DEFAULT_MOTTLE,
   DEFAULT_OPTICS,
@@ -65,6 +67,24 @@ export function createControls(film: Film, title: TitleControls): GUI {
   o.add(optics, "blur", 0, 6, 0.05)
     .name("blur (film px)")
     .onChange(applyOptics);
+
+  // --- Halation ---
+  // Off here by default (the background already has film's colors), but
+  // sliders start from the library defaults so turning it on shows something.
+  const halation = { ...DEFAULT_HALATION };
+  const halationState = { on: s.halation.amount > 0 };
+  const applyHalation = () =>
+    film.set({
+      halation: { ...halation, amount: halationState.on ? halation.amount : 0 },
+    });
+  const h = gui.addFolder("Halation");
+  h.add(halationState, "on").name("enabled").onChange(applyHalation);
+  h.add(halation, "amount", 0, 3, 0.01).onChange(applyHalation);
+  h.add(halation, "threshold", 0, 1, 0.01).onChange(applyHalation);
+  h.add(halation, "radius", 1, 80, 0.5)
+    .name("radius (film px)")
+    .onChange(applyHalation);
+  h.addColor(halation, "color").onChange(applyHalation);
 
   // --- Mottle ---
   const mottle = { ...s.mottle };
@@ -138,6 +158,11 @@ export function createControls(film: Film, title: TitleControls): GUI {
   t.add(ink, "firmness", 0.5, 3, 0.01).onChange(applyInk);
   t.add(ink, "pinholes", 0, 0.6, 0.005).onChange(applyInk);
   t.add(ink, "seed", 0, 100, 1).onChange(applyInk);
+  t.add(ink, "halation", 0, 3, 0.01).name("halation").onChange(applyInk);
+  t.add(ink, "halationRadius", 0, 60, 0.5)
+    .name("halation radius (px)")
+    .onChange(applyInk);
+  t.addColor(ink, "halationColor").name("halation color").onChange(applyInk);
 
   // --- Footage ---
   const footage = { ...s.footage };
@@ -172,13 +197,15 @@ export function createControls(film: Film, title: TitleControls): GUI {
             resolution: DEFAULT_FRAME.resolution,
           });
           Object.assign(optics, DEFAULT_OPTICS);
+          Object.assign(halation, DEFAULT_HALATION);
+          halationState.on = HORIZON_FILM.halation.amount > 0;
           Object.assign(mottle, DEFAULT_MOTTLE);
           mottleState.on = true;
           Object.assign(grain, DEFAULT_GRAIN);
           grainState.on = true;
           Object.assign(dust, DEFAULT_DUST);
           dustState.on = true;
-          Object.assign(ink, DEFAULT_INK);
+          Object.assign(ink, DEFAULT_INK, HORIZON_INK);
           titleState.on = true;
           title.setPlain(false);
           applyInk();
@@ -190,6 +217,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
           refresh(gui);
           applyFrame();
           applyOptics();
+          applyHalation();
           applyMottle();
           applyGrain();
           applyDust();

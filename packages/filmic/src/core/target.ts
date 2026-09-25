@@ -14,7 +14,30 @@ export interface RenderTarget {
   dispose(): void;
 }
 
-export function createRenderTarget(gl: WebGL2RenderingContext): RenderTarget {
+/** Storage for a render target's texels. */
+export interface TargetFormat {
+  internalFormat: number;
+  format: number;
+  type: number;
+}
+
+/**
+ * Half-float storage, for passes whose faint values would band in 8 bits (e.g.
+ * glows in linear light), or null if this device can't render to it.
+ */
+export function halfFloatFormat(gl: WebGL2RenderingContext): TargetFormat | null {
+  if (!gl.getExtension("EXT_color_buffer_float")) return null;
+  return { internalFormat: gl.RGBA16F, format: gl.RGBA, type: gl.HALF_FLOAT };
+}
+
+export function createRenderTarget(
+  gl: WebGL2RenderingContext,
+  storage: TargetFormat = {
+    internalFormat: gl.RGBA8,
+    format: gl.RGBA,
+    type: gl.UNSIGNED_BYTE,
+  },
+): RenderTarget {
   const texture = gl.createTexture()!;
   gl.bindTexture(gl.TEXTURE_2D, texture);
   // LINEAR so later passes can sample between pixels (blur, halation);
@@ -45,12 +68,12 @@ export function createRenderTarget(gl: WebGL2RenderingContext): RenderTarget {
       gl.texImage2D(
         gl.TEXTURE_2D,
         0,
-        gl.RGBA8,
+        storage.internalFormat,
         w,
         h,
         0,
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
+        storage.format,
+        storage.type,
         null,
       );
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);

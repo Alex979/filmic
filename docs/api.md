@@ -6,6 +6,7 @@ Everything below is exported from `filmic`. For a guided introduction, see the
 - [createFilm](#createfilm)
 - [The Film object](#the-film-object)
 - [Settings](#settings): [frame](#frame) · [optics](#optics) ·
+  [halation](#halation) ·
   [grain](#grain) · [mottle](#mottle) · [dust](#dust) · [footage](#footage)
 - [Sources](#sources): [elementSource](#elementsource) ·
   [shaderSource](#shadersource) · [testPattern](#testpattern) ·
@@ -48,9 +49,9 @@ Throws if WebGL 2 isn't available.
 
 ## Settings
 
-Six groups, all optional in `createFilm` and `film.set()`. Each is exported with
-its defaults (`DEFAULT_FRAME`, `DEFAULT_OPTICS`, `DEFAULT_GRAIN`,
-`DEFAULT_MOTTLE`, `DEFAULT_DUST`, `DEFAULT_FOOTAGE`).
+Seven groups, all optional in `createFilm` and `film.set()`. Each is exported
+with its defaults (`DEFAULT_FRAME`, `DEFAULT_OPTICS`, `DEFAULT_HALATION`,
+`DEFAULT_GRAIN`, `DEFAULT_MOTTLE`, `DEFAULT_DUST`, `DEFAULT_FOOTAGE`).
 
 Sizes are in **film px**: positions on the film frame, which is
 `frame.resolution` film px tall. Effects measured in film px keep their size
@@ -84,6 +85,25 @@ mottle and dust are laid out on it, so they move and scale with the picture.
 | Option | Default | Description                                                                                    |
 | ------ | ------- | ---------------------------------------------------------------------------------------------- |
 | `blur` | `1`     | Lens and emulsion softness: a gaussian blur, in film px. `0` keeps the source pixel-sharp.     |
+
+### halation
+
+The warm glow around bright highlights: light that went through the emulsion,
+bounced off the film base and exposed it again around where it came in. It's
+added as light, before grain, so over dark surroundings it glows and over
+bright ones it barely shows, and highlights stay white. Defaults are tuned by
+eye for sources without a film look; set `amount: 0` for images that already
+have one.
+
+| Option      | Default     | Description                                                                   |
+| ----------- | ----------- | ----------------------------------------------------------------------------- |
+| `amount`    | `1`         | Strength. `0` turns halation off.                                             |
+| `threshold` | `0.6`       | Brightness (0–1) where highlights start to glow. White glows fully.           |
+| `radius`    | `28`        | How far the glow reaches, in film px.                                         |
+| `color`     | `"#ff6230"` | Color of the glow. Real halation is red-orange.                               |
+
+For DOM text, the ink filter has a matching glow: see
+[inkFilter](#inkfilter).
 
 ### grain
 
@@ -243,20 +263,28 @@ uploaded image, whose first row is its top, uses `[1, -1]` and `[0, 1]`.
 inkFilter(options?: Partial<InkOptions>, id?: string): InkFilter
 ```
 
-Adds an SVG filter to the page for a printed-on-film look. Apply it with CSS
-(`filter: url(#id)`, or `element.style.filter = ink.url`) or an SVG `filter`
-attribute. Any number of elements can share one. Pass an `id` to reference it
+Adds an SVG filter to the page for a printed-on-film look. Apply it with CSS:
+`filter: var(--id)` in a stylesheet, or `element.style.filter = ink.filter`.
+That's the ink plus its halation glow; `ink.url` (`url(#id)`) is the ink
+alone. Any number of elements can share one. Pass an `id` to reference it
 from CSS before it exists.
 
-| Option      | Default | Description                                                          |
-| ----------- | ------- | -------------------------------------------------------------------- |
-| `roughness` | `0.6`   | How far noise pushes edges around, in CSS px.                        |
-| `softness`  | `0.7`   | Blur, in CSS px.                                                     |
-| `firmness`  | `1.14`  | Opacity boost after the blur, to firm the edges back up.             |
-| `pinholes`  | `0.175` | Pinholes through the ink: `0` = none, higher = more and larger.     |
-| `seed`      | `0`     | Changes the noise pattern.                                           |
+| Option           | Default     | Description                                                       |
+| ---------------- | ----------- | ----------------------------------------------------------------- |
+| `roughness`      | `0.6`       | How far noise pushes edges around, in CSS px.                     |
+| `softness`       | `0.7`       | Blur, in CSS px.                                                  |
+| `firmness`       | `1.14`      | Opacity boost after the blur, to firm the edges back up.          |
+| `pinholes`       | `0.175`     | Pinholes through the ink: `0` = none, higher = more and larger.   |
+| `seed`           | `0`         | Changes the noise pattern.                                        |
+| `halation`       | `0`         | Halation: a warm glow around light ink. `1` matches the canvas's. |
+| `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
+| `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
 
-The returned `InkFilter` has `id`, `url`, `options`, `set(options)`,
+The glow is made of CSS `drop-shadow()` layers after the SVG filter, so it's
+never cut off at the element's edges. `ink.filter` is `var(--id)`: the custom
+property is set on the page's root element and updates with `set()`.
+
+The returned `InkFilter` has `id`, `url`, `filter`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and
 `destroy()`.
 

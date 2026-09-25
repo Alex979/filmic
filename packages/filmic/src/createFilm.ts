@@ -13,6 +13,7 @@ import { DEFAULT_DUST, type DustOptions } from "./film/dust";
 import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
 import { DEFAULT_MOTTLE, type MottleOptions } from "./film/mottle";
 import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
+import { DEFAULT_HALATION, type HalationOptions } from "./film/halation";
 import type { Source, SourceContext, SourceInstance, View } from "./source";
 import { testPattern } from "./sources/testPattern";
 import {
@@ -34,6 +35,8 @@ export interface FilmUpdate {
   frame?: Partial<FrameOptions>;
   /** Lens and emulsion softness. */
   optics?: Partial<OpticsOptions>;
+  /** The warm glow around bright highlights. */
+  halation?: Partial<HalationOptions>;
   /** Faint, soft blotches of density and color. */
   mottle?: Partial<MottleOptions>;
   grain?: Partial<GrainOptions>;
@@ -109,6 +112,7 @@ export function createFilm(
   const settings: FilmSettings = {
     frame: { ...DEFAULT_FRAME, ...options.frame },
     optics: { ...DEFAULT_OPTICS, ...options.optics },
+    halation: { ...DEFAULT_HALATION, ...options.halation },
     mottle: { ...DEFAULT_MOTTLE, ...options.mottle },
     grain: { ...DEFAULT_GRAIN, ...options.grain },
     dust: { ...DEFAULT_DUST, ...options.dust },
@@ -265,6 +269,8 @@ export function createFilm(
       if (update.frame) settings.frame = { ...settings.frame, ...update.frame };
       if (update.optics)
         settings.optics = { ...settings.optics, ...update.optics };
+      if (update.halation)
+        settings.halation = { ...settings.halation, ...update.halation };
       if (update.mottle)
         settings.mottle = { ...settings.mottle, ...update.mottle };
       if (update.grain) settings.grain = { ...settings.grain, ...update.grain };
@@ -287,6 +293,7 @@ export function createFilm(
           anchor: [settings.frame.anchor[0], settings.frame.anchor[1]],
         },
         optics: { ...settings.optics },
+        halation: { ...settings.halation },
         mottle: { ...settings.mottle },
         grain: { ...settings.grain },
         dust: { ...settings.dust },

@@ -1,3 +1,5 @@
+import { hexToRgb, type Hex } from "../core/color";
+
 /**
  * Ink: the "printed on film" look for DOM elements (text, logos, boxes), as an
  * SVG filter the browser applies itself.
@@ -11,6 +13,12 @@
  *   2. a small blur softens them (slightly out of focus)
  *   3. alpha is boosted to firm the softened edge back up
  *   4. a second noise field, thresholded, punches pinholes through the ink
+ *
+ * Halation, the warm glow film gives bright highlights, is added after the
+ * filter as CSS drop-shadow() glows: unlike the SVG filter, CSS filter
+ * functions grow the painted area as far as they need, so the glow is never
+ * cut off at the edge of the element. It's part of `ink.filter`, not
+ * `ink.url`.
  *
  * Sizes are in CSS px, because the browser applies the filter in the
  * element's own coordinates.
@@ -30,6 +38,12 @@ export interface InkOptions {
   pinholes: number;
   /** Changes the noise pattern. Footage mode changes it every frame. */
   seed: number;
+  /** Halation: a warm glow around the ink, for light ink. 0 = none. */
+  halation: number;
+  /** How far the glow reaches, in CSS px. */
+  halationRadius: number;
+  /** Color of the glow, "#rrggbb". */
+  halationColor: Hex;
 }
 
 /** Defaults: a subtle printed look for display-size text. */
@@ -39,6 +53,9 @@ export const DEFAULT_INK: InkOptions = {
   firmness: 1.14,
   pinholes: 0.175,
   seed: 0,
+  halation: 0,
+  halationRadius: 14,
+  halationColor: "#ff6230",
 };
 
 export interface InkFilter {
@@ -49,6 +66,12 @@ export interface InkFilter {
    * or an SVG element's `filter` attribute.
    */
   readonly url: string;
+  /**
+   * The full CSS filter value: the ink plus its halation glow, as
+   * `var(--id)`. The custom property is set on the page's root element and
+   * follows `set()`, so in a stylesheet `filter: var(--title-ink)` works too.
+   */
+  readonly filter: string;
   /** Current options. */
   readonly options: Readonly<InkOptions>;
   /** Change options; elements using the filter update right away. */
@@ -142,18 +165,44 @@ export function inkFilter(
       `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  -8 0 0 0 ${threshold}`,
     );
   };
+  // The halation: a bright rim, a soft glow and a wide tail, each glowing off
+  // the ones before it. CSS blends glows in sRGB, where a faint tail looks
+  // much dimmer than the same light blended in linear (as the canvas does),
+  // so it takes three layers to get film's long, luminous falloff. The rim is
+  // a little lighter, like the hot edge of real halation.
+  const glow = (o: InkOptions) => {
+    if (o.halation <= 0 || o.halationRadius <= 0) return "";
+    const rgb = hexToRgb(o.halationColor);
+    const shadow = (blur: number, alpha: number, light = 0) => {
+      const [r, g, b] = rgb.map((v) => Math.round((v + (1 - v) * light) * 255));
+      const a = Math.min(1, alpha * o.halation).toFixed(3);
+      // CSS blur lengths are two standard deviations.
+      return ` drop-shadow(0 0 ${(blur * o.halationRadius).toFixed(2)}px rgb(${r} ${g} ${b} / ${a}))`;
+    };
+    return shadow(0.21, 0.45, 0.1) + shadow(0.71, 0.5) + shadow(2, 0.45);
+  };
+  const property = `--${id}`;
+  const publish = () =>
+    document.documentElement.style.setProperty(
+      property,
+      `url(#${id})${glow(current)}`,
+    );
+
   apply();
+  publish();
   document.body.appendChild(svg);
 
   return {
     id,
     url: `url(#${id})`,
+    filter: `var(${property})`,
     get options() {
       return { ...current };
     },
     set(options) {
       current = { ...current, ...options };
       apply();
+      publish();
     },
     setFrame(n) {
       const next = Math.max(0, Math.floor(n));
@@ -163,6 +212,7 @@ export function inkFilter(
     },
     destroy() {
       svg.remove();
+      document.documentElement.style.removeProperty(property);
     },
   };
 }

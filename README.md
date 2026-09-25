@@ -2,8 +2,8 @@
 
 A procedural film look for the web. Point it at an image, a video, a canvas or
 a shader, and it renders it as if it were shot on film and projected: grain,
-soft optics, mottle, dust, and, if you want, the gentle weave and flicker of
-real footage.
+soft optics, a warm glow around highlights, mottle, dust, and, if you want,
+the gentle weave and flicker of real footage.
 
 - **Everything is procedural.** No film scans or textures to download; it's a
   few WebGL passes on one canvas.
@@ -171,7 +171,8 @@ gives them the same look:
 
 - **`inkFilter()`** is an SVG filter for a printed-on-film look: slightly
   rough, soft edges and tiny pinholes. It works on any element, and selection
-  highlights and the text cursor get it too.
+  highlights and the text cursor get it too. With `halation`, light ink also
+  gets film's warm glow, to match the canvas's.
 - **`film.attach(element)`** moves an element with the film each frame (weave
   and flicker) and makes its ink boil. It takes over the element's `transform`
   and `filter`, so attach a wrapper around your content.
@@ -198,7 +199,7 @@ gives them the same look:
 }
 .hero-text h1,
 .hero-text .tagline {
-  filter: url(#title-ink);
+  filter: var(--title-ink); /* the ink, plus its halation glow */
 }
 .tagline {
   animation: fade-up 1.2s 0.6s both;
@@ -218,7 +219,7 @@ const film = createFilm(canvas, {
   source: elementSource(photo),
   footage: { enabled: true },
 });
-const ink = inkFilter({}, "title-ink"); // the id the CSS refers to
+const ink = inkFilter({ halation: 1 }, "title-ink"); // the id the CSS refers to
 
 const text = document.querySelector<HTMLElement>(".hero-text")!;
 film.attach(text, { ink }); // weave, flicker, boiling ink
@@ -272,20 +273,24 @@ export function FilmedPhoto({ src }: { src: string }) {
 
 Settings come in groups, all optional, all changeable with `film.set()`:
 
-| Group     | What it controls                                                     |
-| --------- | -------------------------------------------------------------------- |
-| `frame`   | The film frame: how it's fitted to the canvas, and its resolution    |
-| `optics`  | Lens and emulsion softness                                           |
-| `grain`   | Size, strength per brightness, color, crispness, edge breakup        |
-| `mottle`  | Faint blotches and streaks of density and color                      |
-| `dust`    | How much dust, how big, how much is dark, how many hairs             |
-| `footage` | Frame rate, weave, flicker, new grain and dust per frame             |
+| Group      | What it controls                                                   |
+| ---------- | ------------------------------------------------------------------ |
+| `frame`    | The film frame: how it's fitted to the canvas, and its resolution  |
+| `optics`   | Lens and emulsion softness                                         |
+| `halation` | The warm glow around bright highlights: strength, threshold, reach |
+| `grain`    | Size, strength per brightness, color, crispness, edge breakup      |
+| `mottle`   | Faint blotches and streaks of density and color                    |
+| `dust`     | How much dust, how big, how much is dark, how many hairs           |
+| `footage`  | Frame rate, weave, flicker, new grain and dust per frame           |
 
-The defaults are calibrated against scanned film. Sizes are in **film pixels**:
-the film frame is 1080 film px tall by default, and it follows your source's
-picture (for `elementSource`) or covers the canvas at 16:9 (for shaders). So a
-grain of `size: 0.76` is the same fraction of the picture on a phone and on a
-4K screen.
+The defaults are calibrated against scanned film. Halation's are tuned by eye
+for sources without a film look of their own, so turn it off
+(`halation: { amount: 0 }`) for images that already have one.
+
+Sizes are in **film pixels**: the film frame is 1080 film px tall by default,
+and it follows your source's picture (for `elementSource`) or covers the canvas
+at 16:9 (for shaders). So a grain of `size: 0.76` is the same fraction of the
+picture on a phone and on a 4K screen.
 
 Every option and default is listed in [docs/api.md](docs/api.md).
 
@@ -327,8 +332,8 @@ The examples use the library straight from its TypeScript source
 
 ## Roadmap
 
-Done: the render pipeline, shader and element sources, grain, optics, mottle,
-dust, footage mode, ink, and the DOM hooks.
+Done: the render pipeline, shader and element sources, grain, optics,
+halation, mottle, dust, footage mode, ink, and the DOM hooks.
 
 Next:
 
@@ -337,7 +342,7 @@ Next:
 - [ ] Page overlay: real grain and dust over regular page content
 - [ ] Filmed text (opt-in): draw DOM text into the film itself
 - [ ] An npm package with a compiled build
-- [ ] Look (optional): tone curve, halation, vignette
+- [ ] Look (optional): highlight rolloff, vignette
 
 ## License
 

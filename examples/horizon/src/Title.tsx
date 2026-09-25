@@ -29,7 +29,7 @@ interface TitleProps {
   text: string;
   /** 0 = hidden below the horizon, 1 = fully risen. */
   rise: number;
-  /** CSS filter to print the title with (an ink filter's url), if any. */
+  /** CSS filter to print the title with (an ink filter's `filter`), if any. */
   filter?: string;
   /** Shown centered just below the horizon's apex (the subheading). */
   children?: ReactNode;
@@ -187,7 +187,7 @@ export function Title({ text, rise, filter, children }: TitleProps) {
                 fontSize={size.toFixed(1)}
                 textAnchor="middle"
                 opacity={o > 0.001 ? 1 : 0}
-                filter={filter}
+                style={{ filter }}
                 mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
               >
                 <textPath href={`#${uid}-arc`} startOffset="50%">

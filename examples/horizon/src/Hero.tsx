@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createFilm, inkFilter, type Film } from "filmic";
 import { horizonGradient } from "./horizonGradient";
 import { createControls } from "./controls";
+import { HORIZON_FILM, HORIZON_INK } from "./look";
 import { Title } from "./Title";
 
 const INK_ID = "horizon-ink";
@@ -31,9 +32,10 @@ export function Hero() {
     const film = createFilm(canvasRef.current!, {
       source: horizonGradient(),
       footage: { enabled: true },
+      ...HORIZON_FILM,
     });
     filmRef.current = film;
-    const ink = inkFilter({}, INK_ID);
+    const ink = inkFilter(HORIZON_INK, INK_ID);
 
     // The title and subheading sit above the canvas, in a layer that moves
     // with the film: its weave, its flicker, and ink that boils every frame.
@@ -88,7 +90,8 @@ export function Hero() {
     };
   }, [introKey]);
 
-  const filter = plain ? undefined : `url(#${INK_ID})`;
+  // The ink and its halation glow (see inkFilter's `filter`).
+  const filter = plain ? undefined : `var(--${INK_ID})`;
   return (
     <>
       <canvas ref={canvasRef} className="film" />

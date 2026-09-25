@@ -13,6 +13,8 @@ export { DEFAULT_FRAME, fitRect, resolveFrame } from "./film/frame";
 export type { FrameOptions, FrameFit, Rect } from "./film/frame";
 export { DEFAULT_OPTICS } from "./film/optics";
 export type { OpticsOptions } from "./film/optics";
+export { DEFAULT_HALATION } from "./film/halation";
+export type { HalationOptions } from "./film/halation";
 export { DEFAULT_MOTTLE } from "./film/mottle";
 export type { MottleOptions } from "./film/mottle";
 export { DEFAULT_GRAIN } from "./film/grain";
