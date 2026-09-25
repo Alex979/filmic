@@ -20,6 +20,9 @@ const RISE_DUR = 1.4;
 // pointer reads smoothly. The frames in between keep the footage frame's
 // grain and weave.
 const BLOB_FPS = 24;
+// On a touch screen, a touch this near the target ring (px from its center)
+// picks it up to drag, instead of scrolling the page.
+const RING_REACH = 48;
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
@@ -114,7 +117,8 @@ export function Showcase() {
     };
 
     // With a mouse, the target is the pointer and the ring replaces it. On a
-    // touch screen, dragging scrolls, so a tap moves the target instead.
+    // touch screen, dragging scrolls, so a tap moves the target instead, or
+    // a drag that starts on the ring moves it along.
     const root = document.documentElement;
     const cursor = createCursor(ink, stage);
     let mouse = matchMedia("(hover: hover)").matches;
@@ -130,7 +134,16 @@ export function Showcase() {
       cursor.show(free && inside);
       root.classList.toggle("no-cursor", free && mouse);
     };
+    // The touch dragging the ring, if one is, and how far the ring is from
+    // it (so it doesn't jump to the finger).
+    let drag: { id: number; dx: number; dy: number } | null = null;
     const onMove = (e: PointerEvent) => {
+      if (drag && e.pointerId === drag.id) {
+        const { x, y } = onStage(e);
+        play.pointTo(x + drag.dx, y + drag.dy);
+        cursor.moveTo(x + drag.dx, y + drag.dy);
+        return;
+      }
       if (e.pointerType === "touch") return;
       mouse = inside = true;
       const { x, y } = onStage(e);
@@ -154,10 +167,31 @@ export function Showcase() {
         return cursor.press(true);
       }
       if ((e.target as Element).closest?.(".lil-gui")) return;
+      if (play.free && !drag) {
+        const { x, y } = onStage(e);
+        const ring = play.target;
+        if (Math.hypot(x - ring.x, y - ring.y) < RING_REACH) {
+          drag = { id: e.pointerId, dx: ring.x - x, dy: ring.y - y };
+          cursor.moveTo(ring.x, ring.y); // (ending any glide)
+          cursor.hold(true);
+          return;
+        }
+      }
       tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
+    };
+    // A touch that picked up the ring drags it, rather than the page.
+    const onTouchStart = (e: TouchEvent) => {
+      if (drag) e.preventDefault();
+    };
+    const letGo = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return false;
+      drag = null;
+      cursor.hold(false);
+      return true;
     };
     const onUp = (e: PointerEvent) => {
       cursor.press(false);
+      if (letGo(e)) return;
       if (!tap || e.pointerId !== tap.id) return;
       const quick =
         e.timeStamp - tap.t < 400 &&
@@ -168,9 +202,10 @@ export function Showcase() {
       play.pointTo(x, y);
       cursor.moveTo(x, y, true);
     };
-    const onCancel = () => {
+    const onCancel = (e: PointerEvent) => {
       tap = null;
       cursor.press(false);
+      letGo(e);
     };
     scroller.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("pointermove", onMove, { passive: true });
@@ -178,6 +213,7 @@ export function Showcase() {
     window.addEventListener("pointerup", onUp, { passive: true });
     window.addEventListener("pointercancel", onCancel, { passive: true });
     root.addEventListener("pointerleave", onLeave);
+    stage.addEventListener("touchstart", onTouchStart, { passive: false });
 
     // --- Animation: with the film ---
     // The scene steps the blob and the melt as it draws; the title follows
@@ -233,6 +269,7 @@ export function Showcase() {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
       root.removeEventListener("pointerleave", onLeave);
+      stage.removeEventListener("touchstart", onTouchStart);
       root.classList.remove("no-cursor");
       offFrame();
       cancelAnimationFrame(raf);

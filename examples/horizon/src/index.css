@@ -235,6 +235,11 @@ body {
   transform: scale(0.8);
 }
 
+/* Dragged by a finger: bigger, so it shows around the fingertip. */
+.cursor.on.held .cursor-mark {
+  transform: scale(1.5);
+}
+
 /* While the ring stands in for the pointer. */
 .no-cursor,
 .no-cursor * {

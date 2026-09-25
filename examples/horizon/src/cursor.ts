@@ -12,6 +12,8 @@ export interface Cursor {
   moveTo(x: number, y: number, glide?: boolean): void;
   /** Pressed down (mouse button held). */
   press(on: boolean): void;
+  /** Held by a finger, being dragged: it opens out, to show around it. */
+  hold(on: boolean): void;
   destroy(): void;
 }
 
@@ -38,6 +40,9 @@ export function createCursor(ink: InkFilter, parent: HTMLElement): Cursor {
     },
     press(on) {
       el.classList.toggle("pressed", on);
+    },
+    hold(on) {
+      el.classList.toggle("held", on);
     },
     destroy() {
       el.remove();
