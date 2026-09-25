@@ -152,6 +152,8 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Its own layer, so the weave moves it without repainting the ink. */
+  will-change: transform;
 }
 
 .film-layer .subtitle {
