@@ -344,8 +344,8 @@ export function createSound(): Sound {
     motion(x, speed) {
       if (!on) return;
       const s = clamp(speed, 0, 1);
-      ease(windFilter.frequency, 260 + 1300 * s, 0.07);
-      ease(windGain.gain, 0.16 * Math.pow(s, 1.6), 0.07);
+      ease(windFilter.frequency, 240 + 900 * s, 0.07);
+      ease(windGain.gain, 0.07 * Math.pow(s, 1.6), 0.07);
       ease(windPan.pan, (x * 2 - 1) * 0.7, 0.1);
     },
     chord(i) {
