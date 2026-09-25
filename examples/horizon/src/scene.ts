@@ -16,7 +16,7 @@ import {
  *   - the planet's night side below it: faint moonlit clouds and city lights
  *     on a sphere, which turns as the page scrolls (they fade in as it
  *     starts, so the hero at the top is just the gradient)
- *   - the blob, printed in the title's ink
+ *   - the blob, printed in the title's ink, with its eyes
  *
  * The blob is drawn here rather than on the page so it's filmed like the rest:
  * the film's softness, grain, weave and halation all land on it. Only it and
@@ -33,6 +33,7 @@ export interface SceneFrame {
 
 // Colors, in linear light.
 const INK: Hex = "#f2ede4"; // the title's ink (--light)
+const EYE: Hex = "#1c1612"; // the blob's eyes: the page's darkest ink
 const MOONLIGHT: Hex = "#1c222c"; // the brightest a cloud gets far from the glow
 const SODIUM: Hex = "#ff9a4a"; // city lights; the brightest are white-hot
 const glsl = (hex: Hex) =>
@@ -69,10 +70,13 @@ uniform vec3 uNodes[${MAX_NODES}];  // the blob, head to tail tip: x, y, radius 
 uniform int uNodeCount;
 uniform vec3 uBlobBounds;           // circle around it all: xy, radius
 uniform vec3 uBlob;                 // opacity, boil, head radius
+uniform vec4 uEyes[2];              // each: center xy, squeeze across and down
+uniform vec2 uEyeMood;              // happy (0 = round, 1 = ^), open (0 = blinking)
 
 const int COLUMNS = ${COLUMNS};
 const float ARC_SPAN = ${ARC_SPAN.toFixed(4)};
 const vec3 INK = ${glsl(INK)};
+const vec3 EYE = ${glsl(EYE)};
 const vec3 MOONLIGHT = ${glsl(MOONLIGHT)};
 const vec3 SODIUM = ${glsl(SODIUM)};
 
@@ -194,6 +198,26 @@ float blob(vec2 p) {
   return d + r * .07 * gnoise(vec3((p - head.xy) / r * 1.1, uBlob.y * .61));
 }
 
+// Distance to the segment from a to b.
+float segment(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  return length(pa - ba * clamp(dot(pa, ba) / dot(ba, ba), 0., 1.));
+}
+
+// Signed distance to an eye, in CSS px: an oval, which squeezes shut to
+// blink, or a ^ when it's happy (the two blend as it changes). The eye is
+// drawn head-on and squeezed by how far it's turned away.
+float eye(vec2 p, vec4 e) {
+  float s = uBlob.z; // sized from the head
+  vec2 q = (p - e.xy) / e.zw;
+  vec2 ab = s * vec2(.085, max(.14 * uEyeMood.y, .022));
+  float k0 = length(q / ab), k1 = length(q / (ab * ab));
+  float oval = k0 * (k0 - 1.) / max(k1, 1e-6);
+  vec2 c = vec2(abs(q.x), q.y);
+  float caret = segment(c, s * vec2(0., -.07), s * vec2(.12, .04)) - s * .032;
+  return mix(oval, caret, uEyeMood.x) * min(e.z, e.w);
+}
+
 void main() {
   vec2 p = filmPx();
   vec2 d = p - uHorizon.xy;
@@ -214,7 +238,8 @@ void main() {
   if (uBlob.x > 0. && distance(p, uBlobBounds.xy) < uBlobBounds.z) {
     // About a px of edge; the film softens it further.
     float cover = clamp(.5 - blob(p) / 1.2, 0., 1.);
-    c = mix(c, INK, cover * uBlob.x);
+    float look = clamp(.5 - min(eye(p, uEyes[0]), eye(p, uEyes[1])) / 1.2, 0., 1.);
+    c = mix(c, mix(INK, EYE, look), cover * uBlob.x);
   }
 
   fragColor = vec4(linearToSrgb(c), 1.);
@@ -234,6 +259,8 @@ void main() {
       gl.uniform1i(u.uNodeCount, blob.count);
       gl.uniform3f(u.uBlobBounds, ...blob.bounds);
       gl.uniform3f(u.uBlob, blob.opacity, blob.boil % 1000, blob.radius);
+      gl.uniform4fv(u.uEyes, blob.eyes);
+      gl.uniform2f(u.uEyeMood, blob.happy, blob.open);
     },
   );
 }

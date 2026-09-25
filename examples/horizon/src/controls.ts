@@ -24,6 +24,9 @@ interface TitleControls {
   setBoil(on: boolean): void;
   /** Play the intro again. */
   replay(): void;
+  /** The blob's frame rate while the footage plays, and its default. */
+  blobFps: number;
+  defaultBlobFps: number;
 }
 
 /** A tuning panel for a film. Returns the panel so the caller can destroy it. */
@@ -185,6 +188,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
   const fo = gui.addFolder("Footage");
   fo.add(footage, "enabled").name("animated").onChange(applyFootage);
   fo.add(footage, "fps", 1, 60, 1).name("frame rate (fps)").onChange(applyFootage);
+  fo.add(title, "blobFps", 1, 60, 1).name("blob frame rate (fps)");
   fo.add(footage, "grain").name("new grain every frame").onChange(applyFootage);
   fo.add(boil, "on")
     .name("boil title ink")
@@ -225,6 +229,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
           applyInk();
           // This example plays as footage by default.
           Object.assign(footage, DEFAULT_FOOTAGE, { enabled: true });
+          title.blobFps = title.defaultBlobFps;
           boil.on = true;
           title.setBoil(true);
           applyFootage();

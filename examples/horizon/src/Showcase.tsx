@@ -16,6 +16,10 @@ const TITLE = "filmic";
 // title rise is timed with film.frameTime(), so it steps with the footage.
 const RISE_START = 0.35;
 const RISE_DUR = 1.4;
+// The blob is drawn on twos: twice the footage's 12 fps, so chasing the
+// pointer reads smoothly. The frames in between keep the footage frame's
+// grain and weave.
+const BLOB_FPS = 24;
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
@@ -27,7 +31,8 @@ const clamp = (x: number, lo: number, hi: number) =>
  * Two clocks run side by side. What follows input moves at the screen's
  * refresh rate: the page scrolls natively, the scene redraws on every scroll
  * to follow it, and the target ring tracks the pointer. What animates on its
- * own steps with the film at 12 fps: the title's rise and melt, and the blob.
+ * own steps in frames: the title's rise and melt with the film at 12 fps,
+ * and the blob at twice that.
  *
  * The page scrolls inside a screen-sized stage rather than the window, so
  * how far it scrolls doesn't change as a phone's toolbar grows and shrinks.
@@ -54,12 +59,24 @@ export function Showcase() {
     // Keyboard scrolling goes to the focused scroller.
     scroller.focus({ preventScroll: true });
 
+    // The blob's clock: stepped to its own frame rate while the footage
+    // plays (its frames line up with the footage's), or smooth otherwise.
+    let blobFps = BLOB_FPS; // (tunable in the panel)
+    const blobTime = () => {
+      const now = performance.now();
+      return film.frameTime(now) === now
+        ? now
+        : (Math.floor((now * blobFps) / 1000) * 1000) / blobFps;
+    };
+    let blobDrawn = NaN;
+
     const film: Film = createFilm(canvasRef.current!, {
       source: horizonScene((view) => {
         // Read the scroll as the frame is drawn, so the scene is exactly
         // where the page is.
         const scroll = scroller.scrollTop;
-        play.advance(film.frameTime(), view.width, view.height, scroll);
+        blobDrawn = blobTime();
+        play.advance(film.frameTime(), blobDrawn, view.width, view.height, scroll);
         return { scroll, blob: play.shape };
       }),
       footage: { enabled: true },
@@ -171,6 +188,14 @@ export function Showcase() {
       if (!f.playing && play.moving) film.render();
     });
 
+    // With footage, draw the blob's frames that fall between the footage's.
+    let raf = 0;
+    const blobFrames = () => {
+      raf = requestAnimationFrame(blobFrames);
+      if (play.loose && blobTime() !== blobDrawn) film.render();
+    };
+    blobFrames();
+
     const controls = createControls(film, {
       ink,
       text: TITLE,
@@ -185,6 +210,13 @@ export function Showcase() {
         play.reset();
         setIntroKey((k) => k + 1);
       },
+      get blobFps() {
+        return blobFps;
+      },
+      set blobFps(fps) {
+        blobFps = fps;
+      },
+      defaultBlobFps: BLOB_FPS,
     });
     return () => {
       scroller.removeEventListener("scroll", onScroll);
@@ -196,6 +228,7 @@ export function Showcase() {
       root.removeEventListener("pointerleave", onLeave);
       root.classList.remove("no-cursor");
       offFrame();
+      cancelAnimationFrame(raf);
       cursor.destroy();
       controls.destroy();
       unsync();
