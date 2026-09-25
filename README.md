@@ -1,5 +1,8 @@
 # filmic
 
+**[See it live →](https://abro.dev/filmic/)** Scroll down, play with
+the blob, and turn the sound on.
+
 A procedural film look for the web. Point it at an image, a video, a canvas or
 a shader, and it renders it as if it were shot on film and projected: grain,
 soft optics, a warm glow around highlights, mottle, dust, and, if you want,
