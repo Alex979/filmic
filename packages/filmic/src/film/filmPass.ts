@@ -1,5 +1,6 @@
 import { createProgram, FULLSCREEN_VERT } from "../core/gl";
 import type { SourceFrame, View } from "../source";
+import { createDust, DUST_GLSL, type DustOptions } from "./dust";
 import { resolveFrame, type FrameOptions } from "./frame";
 import {
   createGrainTexture,
@@ -22,6 +23,7 @@ export interface FilmSettings {
   optics: OpticsOptions;
   mottle: MottleOptions;
   grain: GrainOptions;
+  dust: DustOptions;
 }
 
 /**
@@ -54,6 +56,7 @@ vec2 filmToUv(vec2 d) {
 
 ${GRAIN_GLSL}
 ${MOTTLE_GLSL}
+${DUST_GLSL}
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uBufferSize;
@@ -69,6 +72,8 @@ void main() {
   c = applyMottle(c, filmPx);
   // 3. Grain on top, strongest in the mid-tones.
   c = applyGrain(c, filmPx);
+  // 4. Dust sits on the film, in front of the grain.
+  c = applyDust(c, uv);
 
   fragColor = vec4(clamp(c, 0., 1.), 1.);
 }`;
@@ -87,17 +92,19 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
   );
   const grainTexture = createGrainTexture(gl);
   const mottleTexture = createMottleTexture(gl);
+  const dust = createDust(gl);
   const opticsPasses = createOptics(gl);
 
   return {
-    draw(sourceFrame, view, { frame: frameOptions, optics, mottle, grain }) {
+    draw(sourceFrame, view, { frame: frameOptions, optics, mottle, grain, dust: dustOptions }) {
       const film = resolveFrame(view, frameOptions, sourceFrame.rect);
 
       // Passes that render into textures come first, before targeting the screen:
-      // the optical blur, and regenerating noise if its settings changed.
+      // the optical blur, dust, and regenerating noise if its settings changed.
       const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
       grainTexture.update(grain.seed, grain.softness, grain.sharpness);
       mottleTexture.update(mottle.seed);
+      const dustTexture = dust.render(view, film, dustOptions);
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       gl.viewport(0, 0, view.bufferWidth, view.bufferHeight);
@@ -148,12 +155,18 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
       gl.uniform1f(u.uMottleChroma, mottle.chroma);
       gl.uniform1f(u.uMottleStreaks, mottle.streaks);
 
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, dustTexture);
+      gl.uniform1i(u.uDust, 3);
+      gl.uniform1f(u.uDustAmount, dustOptions.amount);
+
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
     dispose() {
       gl.deleteProgram(program);
       grainTexture.dispose();
       mottleTexture.dispose();
+      dust.dispose();
       opticsPasses.dispose();
     },
   };

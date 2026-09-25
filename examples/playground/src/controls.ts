@@ -1,5 +1,6 @@
 import GUI from "lil-gui";
 import {
+  DEFAULT_DUST,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
   DEFAULT_MOTTLE,
@@ -75,6 +76,21 @@ export function createControls(): GUI {
   g.add(grain, "seed", 0, 100, 1).onChange(applyGrain);
   g.close();
 
+
+  // --- Dust ---
+  const dust = { ...DEFAULT_DUST };
+  const dustState = { on: true };
+  const applyDust = () =>
+    setAll({ dust: { ...dust, amount: dustState.on ? dust.amount : 0 } });
+  const d = gui.addFolder("Dust");
+  d.add(dustState, "on").name("enabled").onChange(applyDust);
+  d.add(dust, "amount", 0, 4, 0.01).onChange(applyDust);
+  d.add(dust, "density", 0, 1000, 1).onChange(applyDust);
+  d.add(dust, "size", 0.25, 6, 0.01).onChange(applyDust);
+  d.add(dust, "dark", 0, 1, 0.01).name("dark share").onChange(applyDust);
+  d.add(dust, "hairs", 0, 0.5, 0.001).name("hair share").onChange(applyDust);
+  d.add(dust, "seed", 0, 100, 1).onChange(applyDust);
+
   gui
     .add(
       {
@@ -88,11 +104,14 @@ export function createControls(): GUI {
           mottleState.on = true;
           Object.assign(grain, DEFAULT_GRAIN);
           grainState.on = true;
+          Object.assign(dust, DEFAULT_DUST);
+          dustState.on = true;
           gui.controllersRecursive().forEach((c) => c.updateDisplay());
           applyFrame();
           applyOptics();
           applyMottle();
           applyGrain();
+          applyDust();
         },
       },
       "reset",

@@ -17,6 +17,8 @@ export { DEFAULT_MOTTLE } from "./film/mottle";
 export type { MottleOptions } from "./film/mottle";
 export { DEFAULT_GRAIN } from "./film/grain";
 export type { GrainOptions } from "./film/grain";
+export { DEFAULT_DUST, layoutDust } from "./film/dust";
+export type { DustOptions } from "./film/dust";
 
 export { shaderSource } from "./source";
 export type {

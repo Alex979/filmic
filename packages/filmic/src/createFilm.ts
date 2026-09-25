@@ -1,5 +1,6 @@
 import { createFilmPass, type FilmSettings } from "./film/filmPass";
 import { DEFAULT_FRAME, type FrameOptions } from "./film/frame";
+import { DEFAULT_DUST, type DustOptions } from "./film/dust";
 import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
 import { DEFAULT_MOTTLE, type MottleOptions } from "./film/mottle";
 import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
@@ -20,6 +21,8 @@ export interface FilmUpdate {
   /** Faint, soft blotches of density and color. */
   mottle?: Partial<MottleOptions>;
   grain?: Partial<GrainOptions>;
+  /** Specks, fibers and hairs on the film. */
+  dust?: Partial<DustOptions>;
 }
 
 export interface FilmOptions extends FilmUpdate {
@@ -67,6 +70,7 @@ export function createFilm(
     optics: { ...DEFAULT_OPTICS, ...options.optics },
     mottle: { ...DEFAULT_MOTTLE, ...options.mottle },
     grain: { ...DEFAULT_GRAIN, ...options.grain },
+    dust: { ...DEFAULT_DUST, ...options.dust },
   };
 
   const view: View = {
@@ -151,6 +155,7 @@ export function createFilm(
       if (update.mottle)
         settings.mottle = { ...settings.mottle, ...update.mottle };
       if (update.grain) settings.grain = { ...settings.grain, ...update.grain };
+      if (update.dust) settings.dust = { ...settings.dust, ...update.dust };
       render();
     },
     get settings(): FilmSettings {
@@ -164,6 +169,7 @@ export function createFilm(
         optics: { ...settings.optics },
         mottle: { ...settings.mottle },
         grain: { ...settings.grain },
+        dust: { ...settings.dust },
       };
     },
     render,

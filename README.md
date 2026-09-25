@@ -38,7 +38,7 @@ bun lint
 - [x] `elementSource`: film any canvas (2D, p5, Pixi, Three…), video or image, with object-fit
 - [x] Playground example: every kind of source in resizable cards
 - [x] Mottle: faint blotches and streaks of density and color
-- [ ] Dust: procedural specks and hairs
+- [x] Dust: procedural specks, fibers, hairs and thin lines
 - [ ] Title: curved text (SVG overlay, or drawn into the source)
 - [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust
 - [ ] Controls panel
