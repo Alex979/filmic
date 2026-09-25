@@ -32,16 +32,17 @@ export interface DustOptions {
 }
 
 /**
- * Defaults measured from a scanned-film reference: how many pieces, their size
- * and opacity spread, the light/dark share, and how many are long, all at a
- * 1080 film px frame.
+ * Defaults measured from scanned film: how many pieces, their size and
+ * opacity spread and the light/dark share, all at a 1080 film px frame. The
+ * hair share is set a little below what was measured, by eye: in motion,
+ * hairs draw the eye more than their share suggests.
  */
 export const DEFAULT_DUST: DustOptions = {
   amount: 1,
   density: 240,
   size: 1,
   dark: 0.15,
-  hairs: 0.054,
+  hairs: 0.035,
   seed: 0,
 };
 
@@ -365,7 +366,7 @@ void main() {
 
 /**
  * GLSL for the film pass: composite the dust coverage over the image.
- * Light dust pulls toward a slightly cool white (fitted to the reference;
+ * Light dust pulls toward a slightly cool white (fitted to scanned dust;
  * the blue goes a little past 1), dark dust toward near-black.
  */
 export const DUST_GLSL = /* glsl */ `
