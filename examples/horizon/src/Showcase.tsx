@@ -293,6 +293,18 @@ export function Showcase() {
     let wasHappy = false;
 
     // --- Animation: with the film ---
+    // With footage, the blob's frames that fall between the footage's are
+    // drawn here, while it's out (started by the frame listener below).
+    let raf = 0;
+    const blobFrames = () => {
+      if (!play.loose) {
+        raf = 0;
+        return;
+      }
+      raf = requestAnimationFrame(blobFrames);
+      if (blobTime() !== blobDrawn) film.render();
+    };
+
     // The scene steps the blob and the melt as it draws; the title follows
     // here, in the same animation frame, so the ink changes hands cleanly.
     let shown = -1;
@@ -323,17 +335,10 @@ export function Showcase() {
         play.shape.nodes[0] / Math.max(stage.clientWidth, 1),
         play.loose ? play.speed / 25 : 0,
       );
+      if (play.loose && !raf) raf = requestAnimationFrame(blobFrames);
       // Without footage nothing else redraws, so keep going while it moves.
       if (!f.playing && play.moving) film.render();
     });
-
-    // With footage, draw the blob's frames that fall between the footage's.
-    let raf = 0;
-    const blobFrames = () => {
-      raf = requestAnimationFrame(blobFrames);
-      if (play.loose && blobTime() !== blobDrawn) film.render();
-    };
-    blobFrames();
 
     const controls = createControls(film, {
       ink,
