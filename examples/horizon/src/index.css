@@ -23,10 +23,15 @@ body {
   height: 100lvh;
   overflow: hidden;
   isolation: isolate;
+  /* Only the title and subtitle are selectable. Otherwise a long press that
+     misses the text selects the whole hero on iOS. */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* filmic sizes its drawing buffer to match whatever size CSS gives the canvas. */
 .film {
+  -webkit-touch-callout: none; /* no press-and-hold menu on the canvas */
   position: absolute;
   inset: 0;
   display: block;
@@ -82,7 +87,12 @@ body {
   font-weight: 465;
   letter-spacing: -0.012em;
   fill: var(--light);
-  pointer-events: auto; /* selectable */
+  -webkit-user-select: text;
+  user-select: text;
+  /* Hit anywhere in the title's box, not just on the letters' strokes, so a
+     long press on a phone finds it. */
+  pointer-events: auto;
+  pointer-events: bounding-box;
   /* An invisible skew, so no letter on the curve is exactly upright. Browsers
      snap upright glyphs to whole pixels, so a letter at the top of the arc
      would jitter on its own each time the ink redraws at a new weave offset. */
@@ -118,6 +128,8 @@ body {
 }
 
 .film-layer .subtitle {
+  -webkit-user-select: text;
+  user-select: text;
   pointer-events: auto; /* selectable */
   /* Stepped at the footage frame rate by film.sync(). */
   animation: subtitle-in 1.2s cubic-bezier(0.33, 1, 0.68, 1) 1.35s both;
