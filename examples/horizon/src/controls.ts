@@ -48,7 +48,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
       },
     });
   const f = gui.addFolder("Frame");
-  f.add(frame, "fit", ["cover", "contain", "fill", "screen"]).onChange(
+  f.add(frame, "fit", ["source", "cover", "contain", "fill", "screen"]).onChange(
     applyFrame,
   );
   f.add(frame, "aspect", 0.5, 3, 0.01).onChange(applyFrame);
@@ -57,7 +57,6 @@ export function createControls(film: Film, title: TitleControls): GUI {
   f.add(frame, "resolution", 240, 4320, 1)
     .name("resolution (film px tall)")
     .onChange(applyFrame);
-  f.close();
 
   // --- Optics ---
   const optics = { ...s.optics };
@@ -200,5 +199,9 @@ export function createControls(film: Film, title: TitleControls): GUI {
     )
     .name("reset all");
 
+  // Start collapsed, with every section closed: a small title bar over the
+  // film until someone opens it.
+  gui.folders.forEach((folder) => folder.close());
+  gui.close();
   return gui;
 }

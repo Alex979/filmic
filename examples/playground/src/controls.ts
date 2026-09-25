@@ -136,6 +136,9 @@ export function createControls(): GUI {
     )
     .name("reset all");
 
-  if (window.innerWidth < 720) gui.close(); // don't cover the page on phones
+  // Start collapsed, with every section closed: a small title bar over the
+  // film until someone opens it.
+  gui.folders.forEach((folder) => folder.close());
+  gui.close();
   return gui;
 }

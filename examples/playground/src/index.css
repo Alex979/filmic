@@ -27,7 +27,7 @@ header {
 /* room on the right for the lil-gui panel */
 @media (min-width: 720px) {
   header {
-    padding-right: 290px;
+    padding-right: 324px;
   }
 }
 
