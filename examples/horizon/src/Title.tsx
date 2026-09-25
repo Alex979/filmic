@@ -41,8 +41,6 @@ interface TitleProps {
    * run into one drop of ink (see Play).
    */
   melt?: number;
-  /** Film frame, so the melting ink boils with the film. */
-  boil?: number;
   /** Hide the text (its ink is out as the blob). */
   hidden?: boolean;
   /** Where the letters gather as they melt, whenever that moves. */
@@ -61,8 +59,9 @@ interface TitleProps {
  * sweeps across from left to right to reveal it.
  *
  * It can also melt: the letters slide together along the arc and shrink,
- * while a "goo" filter (the ink's roughness, then a growing blur cut back to
- * a hard edge) rounds them off and runs them into one drop.
+ * while a "goo" filter (a growing blur cut back to a hard edge) rounds them
+ * off and runs them into one drop. The ink prints over that, so the drop
+ * keeps the title's rough, boiling edge.
  */
 export function Title({
   text,
@@ -70,7 +69,6 @@ export function Title({
   filter,
   glow,
   melt = 0,
-  boil = 0,
   hidden = false,
   onAnchor,
   children,
@@ -250,9 +248,7 @@ export function Title({
                 height={bandHeight.toFixed(1)}
                 colorInterpolationFilters="sRGB"
               >
-                <feTurbulence type="fractalNoise" baseFrequency={0.9} numOctaves={1} seed={4 + (boil % 997)} result="n" />
-                <feDisplacementMap in="SourceGraphic" in2="n" scale={0.7} xChannelSelector="R" yChannelSelector="G" result="rough" />
-                <feMorphology in="rough" operator="dilate" radius={dilate.toFixed(2)} result="fat" />
+                <feMorphology in="SourceGraphic" operator="dilate" radius={dilate.toFixed(2)} result="fat" />
                 <feGaussianBlur in="fat" stdDeviation={sigma.toFixed(2)} result="soft" />
                 <feComponentTransfer in="soft">
                   <feFuncA type="linear" slope={firm.toFixed(3)} intercept={(0.5 - firm * cut).toFixed(3)} />

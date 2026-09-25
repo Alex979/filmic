@@ -59,7 +59,7 @@ export function Showcase() {
   const [started, setStarted] = useState(false);
   const [introKey, setIntroKey] = useState(0);
   const [rise, setRise] = useState(0);
-  const [melt, setMelt] = useState({ amount: 0, boil: 0, hidden: false });
+  const [melt, setMelt] = useState({ amount: 0, hidden: false });
   const soundRef = useRef<Sound | null>(null);
   const [soundOn, setSoundOn] = useState(false);
 
@@ -290,7 +290,7 @@ export function Showcase() {
       if (play.version !== shown) {
         shown = play.version;
         flushSync(() =>
-          setMelt({ amount: play.melt, boil: f.n, hidden: play.loose }),
+          setMelt({ amount: play.melt, hidden: play.loose }),
         );
       }
       showCursor();
@@ -433,7 +433,6 @@ export function Showcase() {
               filter={filter}
               glow={glow}
               melt={melt.amount}
-              boil={melt.boil}
               hidden={melt.hidden}
               onAnchor={play.setAnchor}
             >
