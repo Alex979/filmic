@@ -135,3 +135,12 @@ body {
 .subtitle > span {
   display: inline-block;
 }
+
+/* Selection as film would show it: a bright, warm box (which the ink's
+   halation glows around, like any highlight) with the text dark on it. The
+   browser's blue would glow orange, since a glow can't take on its color. */
+.film-layer ::selection {
+  background: rgb(242 237 228 / 0.92);
+  color: #1c1612;
+  fill: #1c1612; /* SVG text */
+}
