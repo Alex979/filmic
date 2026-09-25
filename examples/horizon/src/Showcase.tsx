@@ -62,6 +62,9 @@ export function Showcase() {
   const [melt, setMelt] = useState({ amount: 0, hidden: false });
   const soundRef = useRef<Sound | null>(null);
   const [soundOn, setSoundOn] = useState(false);
+  // Stops waiting to turn sound back on (see below): once it's toggled by
+  // hand, that's the choice.
+  const stopResumeRef = useRef(() => {});
 
   useEffect(() => {
     const stage = stageRef.current!;
@@ -175,6 +178,8 @@ export function Showcase() {
     const onDown = (e: PointerEvent) => {
       const el = e.target as Element;
       if (e.pointerType !== "touch") {
+        // (On the page's scrollbar: not a press on the scene.)
+        if (onStage(e).x >= scroller.clientWidth) return;
         // Most of the page can't be selected (see .page), so the browser
         // leaves a selection alone when you click it. Clear it by hand.
         if (e.button === 0 && !el.closest?.(`.title, .subtitle, ${UI}`)) {
@@ -194,6 +199,7 @@ export function Showcase() {
           return;
         }
       }
+      if (el.closest?.(".title, .subtitle")) return;
       tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
     };
     // A touch that picked up the ring drags it, rather than the page.
@@ -239,10 +245,14 @@ export function Showcase() {
     // If it was on last time, the first press anywhere turns it back on.
     const sound = createSound();
     soundRef.current = sound;
-    const resume = (e: Event) => {
-      if ((e.target as Element).closest?.(".sound")) return; // (it toggles itself)
+    const stopResume = () => {
       removeEventListener("pointerdown", resume);
       removeEventListener("keydown", resume);
+    };
+    stopResumeRef.current = stopResume;
+    const resume = (e: Event) => {
+      if ((e.target as Element).closest?.(".sound")) return; // (it toggles itself)
+      stopResume();
       if (sound.on) return;
       sound.enable();
       setSoundOn(true);
@@ -358,8 +368,7 @@ export function Showcase() {
       stage.removeEventListener("touchstart", onTouchStart);
       root.classList.remove("no-cursor");
       offFrame();
-      removeEventListener("pointerdown", resume);
-      removeEventListener("keydown", resume);
+      stopResume();
       document.removeEventListener("visibilitychange", onVisibility);
       document.removeEventListener("selectionchange", onSelect);
       sound.destroy();
@@ -406,6 +415,7 @@ export function Showcase() {
   const toggleSound = () => {
     const sound = soundRef.current;
     if (!sound) return;
+    stopResumeRef.current();
     if (sound.on) sound.disable();
     else sound.enable();
     setSoundOn(sound.on);

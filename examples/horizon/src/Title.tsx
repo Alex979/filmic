@@ -175,6 +175,7 @@ export function Title({
     if (W) onAnchor?.({ x: ax, y: ay, size });
   }, [W, ax, ay, size, onAnchor]);
   const m = clamp(melt, 0, 1);
+  const shown = o > 0.001 && !hidden;
   const goo = ease.in(m);
   const squeeze = -0.36 * ease.inOut(m);
   const shrink = 1 - 0.5 * goo;
@@ -278,9 +279,15 @@ export function Title({
                   aria-level={1}
                   fontSize={size.toFixed(1)}
                   textAnchor="middle"
-                  opacity={o > 0.001 && !hidden ? 1 : 0}
+                  opacity={shown ? 1 : 0}
                   letterSpacing={m > 0 ? `${squeeze.toFixed(4)}em` : undefined}
-                  style={{ filter: m > 0 ? `url(#${uid}-melt)` : undefined }}
+                  style={{
+                    filter: m > 0 ? `url(#${uid}-melt)` : undefined,
+                    // Hidden, it can't be pressed or selected either.
+                    pointerEvents: shown ? undefined : "none",
+                    userSelect: shown ? undefined : "none",
+                    WebkitUserSelect: shown ? undefined : "none",
+                  }}
                   mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
                 >
                   <textPath href={`#${uid}-arc`} startOffset="50%">
