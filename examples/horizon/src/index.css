@@ -87,12 +87,12 @@ body {
   font-weight: 465;
   letter-spacing: -0.012em;
   fill: var(--light);
+  /* Selectable, though only partly: browsers map pointer positions poorly on
+     rotated letters (text on a curve), and iOS doesn't select SVG text on a
+     long press. Screen readers and find-in-page still see it. */
   -webkit-user-select: text;
   user-select: text;
-  /* Hit anywhere in the title's box, not just on the letters' strokes, so a
-     long press on a phone finds it. */
   pointer-events: auto;
-  pointer-events: bounding-box;
   /* An invisible skew, so no letter on the curve is exactly upright. Browsers
      snap upright glyphs to whole pixels, so a letter at the top of the arc
      would jitter on its own each time the ink redraws at a new weave offset. */
