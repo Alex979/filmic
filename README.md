@@ -40,7 +40,7 @@ bun lint
 - [x] Mottle: faint blotches and streaks of density and color
 - [x] Dust: procedural specks, fibers, hairs and thin lines
 - [x] Ink: `inkFilter()` gives DOM text and elements a printed look; curved title in the horizon example
-- [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust; `film.on("frame")`, `sync()` and `attach()` for DOM elements
+- [x] Footage: frame clock at any fps, weave, flicker, per-frame grain and dust; `film.on("frame")`, `frameTime()`, `attach()` and `sync()` for the DOM
 - [ ] Controls panel
 - [ ] Horizon source: the reference's curvature and placement, cloud-like variation in the sky
 - [ ] Page overlay: real grain and dust over DOM content

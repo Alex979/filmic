@@ -1,6 +1,7 @@
 import { createProgram } from "../core/gl";
 import { createRenderTarget } from "../core/target";
 import type { View } from "../source";
+import type { FootageOptions } from "./footage";
 import type { ResolvedFrame } from "./frame";
 
 /**
@@ -84,125 +85,202 @@ function smoothNoise(rng: ReturnType<typeof random>, n: number, every: number) {
   };
 }
 
+type Rng = ReturnType<typeof random>;
+
+/** Receives one capsule: anchor (0..1), ends (film px), sigma, opacity, dark. */
+type Emit = (
+  u: number,
+  v: number,
+  a: [number, number],
+  b: [number, number],
+  sigma: number,
+  peak: number,
+  dark: boolean,
+) => void;
+
+/** A chain of capsules along a wandering path: fibers, hairs and lines. */
+function strand(
+  rng: Rng,
+  emit: Emit,
+  u: number,
+  v: number,
+  size: number,
+  length: number,
+  heading: number,
+  curl: number,
+  sigma: number,
+  peak: number,
+  opacityAt: (i: number) => number,
+) {
+  const step = 1.5 * size;
+  const n = Math.max(2, Math.ceil(length / step));
+  const points: [number, number][] = [[0, 0]];
+  let turn = 0;
+  for (let i = 0; i < n; i++) {
+    turn = turn * 0.85 + rng.gauss() * curl;
+    heading += turn;
+    const [x, y] = points[i];
+    points.push([x + Math.cos(heading) * step, y + Math.sin(heading) * step]);
+  }
+  // Center it on the anchor.
+  const cx = points.reduce((s, p) => s + p[0], 0) / points.length;
+  const cy = points.reduce((s, p) => s + p[1], 0) / points.length;
+  for (let i = 0; i < n; i++) {
+    const taper = Math.min(1, (i + 0.5) / (n * 0.12), (n - i - 0.5) / (n * 0.12));
+    const opacity = peak * taper * opacityAt(i);
+    if (opacity < 0.004) continue;
+    const [ax, ay] = points[i];
+    const [bx, by] = points[i + 1];
+    emit(u, v, [ax - cx, ay - cy], [bx - cx, by - cy], sigma, opacity, false);
+  }
+}
+
+/** One piece of dust, anywhere on the frame, drawn from the mix in `options`. */
+function dustPiece(rng: Rng, options: DustOptions, emit: Emit) {
+  const size = options.size;
+  const u = rng.next();
+  const v = rng.next();
+  const kind = rng.next();
+  const dark = rng.next() < options.dark;
+
+  if (kind < options.hairs * 0.3) {
+    // A thin line along the film, dotted and broken up.
+    const length = (70 + rng.next() * 55) * size;
+    const dots = smoothNoise(rng, length / 1.5, 2.5);
+    strand(
+      rng,
+      emit,
+      u,
+      v,
+      size,
+      length,
+      Math.PI / 2 + rng.gauss() * 0.03,
+      0.004,
+      (0.35 + rng.next() * 0.2) * size,
+      Math.min(0.5, rng.logNormal(0.15, 0.5)),
+      (i) => Math.max(0, dots(i) - 0.45) / 0.55,
+    );
+  } else if (kind < options.hairs) {
+    // A fiber or hair: curly, speckled along its length.
+    const length = Math.min(110, Math.max(10, rng.logNormal(28, 0.55))) * size;
+    const speckle = smoothNoise(rng, length / 1.5, 3);
+    strand(
+      rng,
+      emit,
+      u,
+      v,
+      size,
+      length,
+      rng.next() * Math.PI * 2,
+      0.015 + rng.next() * 0.055,
+      (0.45 + rng.next() * 0.35) * size,
+      rng.logNormal(0.2, 0.3),
+      (i) => 0.35 + 0.65 * speckle(i),
+    );
+  } else if (rng.next() < 0.005) {
+    // A rare clump: a few specks stuck together, uneven and soft.
+    const spread = (1.5 + rng.next() * 2) * size;
+    const specks = 3 + Math.floor(rng.next() * 5);
+    for (let i = 0; i < specks; i++) {
+      const at: [number, number] = [rng.gauss() * spread, rng.gauss() * spread * 0.7];
+      const to: [number, number] = [at[0] + rng.gauss() * size, at[1] + rng.gauss() * size];
+      emit(u, v, at, to, (0.5 + rng.next() * 0.5) * size, 0.12 + rng.next() * 0.22, dark);
+    }
+  } else {
+    // A speck: a soft, slightly elongated dot. Measured sizes include the
+    // scan's softness, so these are the final on-film profiles.
+    const minor = Math.min(1, Math.max(0.25, rng.logNormal(0.42, 0.25))) * size;
+    const major = minor * (1 + rng.logNormal(0.45, 0.45));
+    // A segment of length L blurred by sigma has sd sqrt(L²/12 + sigma²).
+    const half = Math.sqrt(3 * (major * major - minor * minor));
+    const angle = rng.next() * Math.PI;
+    const dx = Math.cos(angle) * half;
+    const dy = Math.sin(angle) * half;
+    emit(u, v, [-dx, -dy], [dx, dy], minor, Math.min(0.7, rng.logNormal(0.19, 0.5)), dark);
+  }
+}
+
+/** An Emit that appends to a flat instance array, shifted by (sx, sy) film px. */
+const emitInto =
+  (out: number[], sx = 0, sy = 0): Emit =>
+  (u, v, a, b, sigma, peak, dark) =>
+    out.push(u, v, a[0] + sx, a[1] + sy, b[0] + sx, b[1] + sy, sigma, dark ? -peak : peak);
+
 /**
- * Lay out the frame's dust. Positions are relative to the frame, so the dust
- * stays put (and stretches at most) when the canvas resizes.
+ * Lay out the still frame's dust. Positions are relative to the frame, so the
+ * dust stays put (and stretches at most) when the canvas resizes.
  */
 export function layoutDust(options: DustOptions): Float32Array {
   const rng = random(options.seed + 1);
-  const size = options.size;
   const out: number[] = [];
-
-  const piece = (
-    u: number,
-    v: number,
-    a: [number, number],
-    b: [number, number],
-    sigma: number,
-    peak: number,
-    dark: boolean,
-  ) => out.push(u, v, a[0], a[1], b[0], b[1], sigma, dark ? -peak : peak);
-
-  // A chain of capsules along a wandering path: fibers, hairs and lines.
-  const strand = (
-    u: number,
-    v: number,
-    length: number,
-    heading: number,
-    curl: number,
-    sigma: number,
-    peak: number,
-    opacityAt: (i: number) => number,
-  ) => {
-    const step = 1.5 * size;
-    const n = Math.max(2, Math.ceil(length / step));
-    const points: [number, number][] = [[0, 0]];
-    let turn = 0;
-    for (let i = 0; i < n; i++) {
-      turn = turn * 0.85 + rng.gauss() * curl;
-      heading += turn;
-      const [x, y] = points[i];
-      points.push([x + Math.cos(heading) * step, y + Math.sin(heading) * step]);
-    }
-    // Center it on the anchor.
-    const cx = points.reduce((s, p) => s + p[0], 0) / points.length;
-    const cy = points.reduce((s, p) => s + p[1], 0) / points.length;
-    for (let i = 0; i < n; i++) {
-      const taper = Math.min(1, (i + 0.5) / (n * 0.12), (n - i - 0.5) / (n * 0.12));
-      const opacity = peak * taper * opacityAt(i);
-      if (opacity < 0.004) continue;
-      const [ax, ay] = points[i];
-      const [bx, by] = points[i + 1];
-      piece(u, v, [ax - cx, ay - cy], [bx - cx, by - cy], sigma, opacity, false);
-    }
-  };
-
+  const emit = emitInto(out);
   const count = Math.max(0, Math.round(options.density));
-  for (let k = 0; k < count; k++) {
-    const u = rng.next();
-    const v = rng.next();
-    const kind = rng.next();
-    const dark = rng.next() < options.dark;
+  for (let k = 0; k < count; k++) dustPiece(rng, options, emit);
+  return new Float32Array(out);
+}
 
-    if (kind < options.hairs * 0.3) {
-      // A thin line along the film, dotted and broken up.
-      const length = (70 + rng.next() * 55) * size;
-      const dots = smoothNoise(rng, length / 1.5, 2.5);
-      strand(
-        u,
-        v,
-        length,
-        Math.PI / 2 + rng.gauss() * 0.03,
-        0.004,
-        (0.35 + rng.next() * 0.2) * size,
-        Math.min(0.5, rng.logNormal(0.15, 0.5)),
-        (i) => Math.max(0, dots(i) - 0.45) / 0.55,
-      );
-    } else if (kind < options.hairs) {
-      // A fiber or hair: curly, speckled along its length.
-      const length = Math.min(110, Math.max(10, rng.logNormal(28, 0.55))) * size;
-      const speckle = smoothNoise(rng, length / 1.5, 3);
-      strand(
-        u,
-        v,
-        length,
-        rng.next() * Math.PI * 2,
-        0.015 + rng.next() * 0.055,
-        (0.45 + rng.next() * 0.35) * size,
-        rng.logNormal(0.2, 0.3),
-        (i) => 0.35 + 0.65 * speckle(i),
-      );
-    } else if (rng.next() < 0.005) {
-      // A rare clump: a few specks stuck together, uneven and soft.
-      const spread = (1.5 + rng.next() * 2) * size;
-      const specks = 3 + Math.floor(rng.next() * 5);
-      for (let i = 0; i < specks; i++) {
-        const at: [number, number] = [rng.gauss() * spread, rng.gauss() * spread * 0.7];
-        const to: [number, number] = [at[0] + rng.gauss() * size, at[1] + rng.gauss() * size];
-        piece(u, v, at, to, (0.5 + rng.next() * 0.5) * size, 0.12 + rng.next() * 0.22, dark);
+/** Longest a speck can linger, in frames. */
+const MAX_LIFE = 6;
+
+/**
+ * Dust for footage frame n: each frame, a Poisson-distributed number of new
+ * pieces lands at random; most last one frame, some linger for 2-6 and wander
+ * about a pixel per frame while they do. Built from the births of the last few
+ * frames, each seeded by its frame number, so frame n is always the same.
+ */
+export function layoutFootageDust(
+  options: DustOptions,
+  rate: number,
+  linger: number,
+  seed: number,
+  n: number,
+): Float32Array {
+  const out: number[] = [];
+  const scratch: number[] = [];
+  for (let age = 0; age < MAX_LIFE; age++) {
+    const born = n - age;
+    const rng = random(Math.floor(hashFrame(born, seed, options.seed) * 4294967296));
+    const count = poisson(rng, Math.max(0, rate));
+    for (let i = 0; i < count; i++) {
+      const life = rng.next() < linger ? 2 + Math.floor(rng.next() * 5) : 1;
+      // Wander: a random step of up to ~1.3 film px for each frame alive.
+      let sx = 0;
+      let sy = 0;
+      for (let k = 1; k <= age; k++) {
+        sx += (rng.next() - 0.5) * 2.6;
+        sy += (rng.next() - 0.5) * 2.6;
       }
-    } else {
-      // A speck: a soft, slightly elongated dot. Measured sizes include the
-      // scan's softness, so these are the final on-film profiles.
-      const minor = Math.min(1, Math.max(0.25, rng.logNormal(0.42, 0.25))) * size;
-      const major = minor * (1 + rng.logNormal(0.45, 0.45));
-      // A segment of length L blurred by sigma has sd sqrt(L²/12 + sigma²).
-      const half = Math.sqrt(3 * (major * major - minor * minor));
-      const angle = rng.next() * Math.PI;
-      const dx = Math.cos(angle) * half;
-      const dy = Math.sin(angle) * half;
-      piece(
-        u,
-        v,
-        [-dx, -dy],
-        [dx, dy],
-        minor,
-        Math.min(0.7, rng.logNormal(0.19, 0.5)),
-        dark,
-      );
+      // Always generate (so the random sequence doesn't depend on n), keep
+      // only what's still alive.
+      scratch.length = 0;
+      dustPiece(rng, options, emitInto(scratch, sx, sy));
+      if (age < life) out.push(...scratch);
     }
   }
   return new Float32Array(out);
+}
+
+/** 0..1 hash of a frame number and two seeds. */
+function hashFrame(n: number, a: number, b: number) {
+  let h = Math.imul(n | 0, 0x9e3779b1) ^ Math.imul((a | 0) + 17, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 15), 0xc2b2ae35) ^ Math.imul((b | 0) + 29, 0x27d4eb2d);
+  h = Math.imul(h ^ (h >>> 13), 0x165667b1);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Poisson-distributed count with mean `lambda`. */
+function poisson(rng: Rng, lambda: number): number {
+  if (lambda <= 0) return 0;
+  // Knuth's method, fine for the small means used here; split large ones.
+  if (lambda > 60) return poisson(rng, lambda / 2) + poisson(rng, lambda / 2);
+  const L = Math.exp(-lambda);
+  let k = 0;
+  let p = 1;
+  do {
+    k++;
+    p *= rng.next();
+  } while (p > L);
+  return k - 1;
 }
 
 const DUST_VERT = /* glsl */ `#version 300 es
@@ -295,8 +373,17 @@ vec3 applyDust(vec3 c, vec2 uv) {
 `;
 
 export interface Dust {
-  /** Render the frame's dust coverage and return it (screen space). */
-  render(view: View, frame: ResolvedFrame, options: DustOptions): WebGLTexture;
+  /**
+   * Render the dust coverage and return it (screen space). With footage
+   * playing, it's frame n's dust instead of the still's.
+   */
+  render(
+    view: View,
+    frame: ResolvedFrame,
+    options: DustOptions,
+    footage: FootageOptions,
+    n: number,
+  ): WebGLTexture;
   dispose(): void;
 }
 
@@ -326,14 +413,21 @@ export function createDust(gl: WebGL2RenderingContext): Dust {
   let count = 0;
 
   return {
-    render(view, frame, options) {
-      const k = [options.density, options.size, options.dark, options.hairs, options.seed].join("|");
+    render(view, frame, options, footage, n) {
+      const shape = [options.size, options.dark, options.hairs, options.seed];
+      const k = (
+        footage.enabled
+          ? [...shape, n, footage.dustRate, footage.dustLinger, footage.seed]
+          : [...shape, options.density]
+      ).join("|");
       if (k !== key) {
         key = k;
-        const data = layoutDust(options);
+        const data = footage.enabled
+          ? layoutFootageDust(options, footage.dustRate, footage.dustLinger, footage.seed, n)
+          : layoutDust(options);
         count = data.length / FLOATS_PER_PIECE;
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
       }
 
       target.resize(view.bufferWidth, view.bufferHeight);

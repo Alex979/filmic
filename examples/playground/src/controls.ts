@@ -1,6 +1,7 @@
 import GUI from "lil-gui";
 import {
   DEFAULT_DUST,
+  DEFAULT_FOOTAGE,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
   DEFAULT_MOTTLE,
@@ -77,6 +78,21 @@ export function createControls(): GUI {
   g.close();
 
 
+  // --- Footage ---
+  const footage = { ...DEFAULT_FOOTAGE };
+  const applyFootage = () => setAll({ footage });
+  const fo = gui.addFolder("Footage");
+  fo.add(footage, "enabled").name("animated").onChange(applyFootage);
+  fo.add(footage, "fps", 1, 60, 1).name("frame rate (fps)").onChange(applyFootage);
+  fo.add(footage, "grain").name("new grain every frame").onChange(applyFootage);
+  fo.add(footage, "weave", 0, 4, 0.01).name("weave (film px)").onChange(applyFootage);
+  fo.add(footage, "weaveRotation", 0, 0.2, 0.001)
+    .name("weave rotation (deg)")
+    .onChange(applyFootage);
+  fo.add(footage, "flicker", 0, 0.2, 0.001).onChange(applyFootage);
+  fo.add(footage, "dustRate", 0, 240, 1).name("dust per frame").onChange(applyFootage);
+  fo.add(footage, "dustLinger", 0, 1, 0.01).name("dust linger chance").onChange(applyFootage);
+
   // --- Dust ---
   const dust = { ...DEFAULT_DUST };
   const dustState = { on: true };
@@ -112,6 +128,8 @@ export function createControls(): GUI {
           applyMottle();
           applyGrain();
           applyDust();
+          Object.assign(footage, DEFAULT_FOOTAGE);
+          applyFootage();
         },
       },
       "reset",

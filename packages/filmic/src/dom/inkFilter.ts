@@ -53,6 +53,12 @@ export interface InkFilter {
   readonly options: Readonly<InkOptions>;
   /** Change options; elements using the filter update right away. */
   set(options: Partial<InkOptions>): void;
+  /**
+   * Footage frame to show: shifts the noise per frame, on top of `seed`, so
+   * edges and pinholes boil like print on moving film. 0 = still. Usually
+   * driven by `film.attach()`.
+   */
+  setFrame(n: number): void;
   /** Remove the filter from the page. */
   destroy(): void;
 }
@@ -70,6 +76,7 @@ export function inkFilter(
   id = `filmic-ink-${++count}`,
 ): InkFilter {
   let current: InkOptions = { ...DEFAULT_INK, ...options };
+  let frame = 0;
 
   const el = <K extends keyof SVGElementTagNameMap>(
     tag: K,
@@ -123,7 +130,7 @@ export function inkFilter(
 
   const apply = () => {
     const o = current;
-    const seed = Math.max(0, Math.floor(o.seed));
+    const seed = Math.max(0, Math.floor(o.seed)) + (frame % 997);
     edgeNoise.setAttribute("seed", String(4 + seed));
     holeNoise.setAttribute("seed", String(12 + seed));
     displace.setAttribute("scale", String(o.roughness));
@@ -146,6 +153,12 @@ export function inkFilter(
     },
     set(options) {
       current = { ...current, ...options };
+      apply();
+    },
+    setFrame(n) {
+      const next = Math.max(0, Math.floor(n));
+      if (next === frame) return;
+      frame = next;
       apply();
     },
     destroy() {

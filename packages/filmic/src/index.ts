@@ -17,8 +17,15 @@ export { DEFAULT_MOTTLE } from "./film/mottle";
 export type { MottleOptions } from "./film/mottle";
 export { DEFAULT_GRAIN } from "./film/grain";
 export type { GrainOptions } from "./film/grain";
-export { DEFAULT_DUST, layoutDust } from "./film/dust";
+export { DEFAULT_DUST, layoutDust, layoutFootageDust } from "./film/dust";
 export type { DustOptions } from "./film/dust";
+export {
+  DEFAULT_FOOTAGE,
+  footageFrame,
+  frameIndex,
+  frameStart,
+} from "./film/footage";
+export type { FootageFrame, FootageOptions } from "./film/footage";
 
 export { hexToRgb, hexToLinear, srgbToLinear } from "./core/color";
 export type { Hex } from "./core/color";
@@ -42,3 +49,4 @@ export { testPattern } from "./sources/testPattern";
 
 export { inkFilter, DEFAULT_INK } from "./dom/inkFilter";
 export type { InkFilter, InkOptions } from "./dom/inkFilter";
+export type { AttachOptions, FrameEvent, FrameListener } from "./dom/sync";

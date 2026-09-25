@@ -73,4 +73,49 @@ body {
   letter-spacing: -0.012em;
   fill: var(--light);
   pointer-events: auto; /* selectable */
+  /* An invisible skew, so no letter on the curve is exactly upright. Browsers
+     snap upright glyphs to whole pixels, so a letter at the top of the arc
+     would jitter on its own each time the ink redraws at a new weave offset. */
+  transform: skewX(0.05deg);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The fade from black: a plain CSS animation, so it runs at the screen's
+   refresh rate even while the footage steps at its own. Ease-out cubic. */
+.fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  pointer-events: none;
+}
+
+.fade.play {
+  animation: fade-in 1.1s cubic-bezier(0.33, 1, 0.68, 1) 0.15s both;
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Everything that moves with the film (see film.attach). */
+.film-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.film-layer .subtitle {
+  pointer-events: auto;
+  /* Stepped at the footage frame rate by film.sync(). */
+  animation: subtitle-in 1.2s cubic-bezier(0.33, 1, 0.68, 1) 1.35s both;
+}
+
+@keyframes subtitle-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em);
+  }
 }

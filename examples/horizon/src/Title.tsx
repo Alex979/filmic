@@ -4,6 +4,12 @@ import { horizonCircle } from "./horizonGradient";
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
 
+const ease = {
+  inOut: (t: number) =>
+    t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+  out: (t: number) => 1 - Math.pow(1 - t, 3),
+};
+
 /** An arc of +-1.1 rad around the top of a circle. */
 function arcPath(cx: number, cy: number, r: number) {
   const sx = Math.sin(1.1) * r;
@@ -14,6 +20,8 @@ function arcPath(cx: number, cy: number, r: number) {
 
 interface TitleProps {
   text: string;
+  /** 0 = hidden below the horizon, 1 = fully risen. */
+  rise: number;
   /** CSS filter to print the title with (an ink filter's url), if any. */
   filter?: string;
 }
@@ -22,11 +30,16 @@ interface TitleProps {
  * The title, set along an arc just above the horizon. It's real SVG text, so
  * it can be selected, found and read by screen readers; the ink filter gives
  * it the printed-on-film look.
+ *
+ * It rises out from behind the planet: a mask centered on the horizon hides
+ * whatever is below the rim, the text slides up through it, and a soft edge
+ * sweeps across from left to right to reveal it.
  */
-export function Title({ text, filter }: TitleProps) {
+export function Title({ text, rise, filter }: TitleProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const textRef = useRef<SVGTextElement>(null);
-  const arcId = useId();
+  const sweepRef = useRef<SVGLinearGradientElement>(null);
+  const uid = useId().replace(/[^\w-]/g, "");
   const [view, setView] = useState({ W: 0, H: 0 });
   const [fontsReady, setFontsReady] = useState(false);
   // Text width per 1px of font size, so long titles can shrink to fit.
@@ -67,25 +80,105 @@ export function Title({ text, filter }: TitleProps) {
   // center, so the title follows its curve.
   const arcR = circle.r + 0.24 * size + (W <= 760 ? 16 : 0);
 
+  // --- Rise ---
+  const o = clamp(rise, 0, 1);
+  // Horizon mask: hidden inside radius `lo` (behind the planet), fully
+  // visible past `hi`. The band slides up with the title as it rises.
+  const bandH = 0.55 * size;
+  const travel = ease.inOut(o) * (bandH + 0.3 * size);
+  const lo = circle.r - travel;
+  const hi = circle.r + bandH - travel;
+  const maskR = hi + 1;
+  const stops: [number, number][] = [
+    [0, 0],
+    [0.35, 0.18],
+    [0.7, 0.62],
+    [1, 1],
+  ];
+  const lift = 1.08 * size * (1 - ease.out(o));
+  const dy = (1 - ease.out(clamp((o - 0.04) / 0.62, 0, 1))) * size * 0.28;
+  const sweep = clamp((o - 0.04) / 0.7, 0, 1);
+
+  // Left-to-right reveal: a soft white-to-black edge sliding across the text.
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    const grad = sweepRef.current;
+    if (!el || !grad || sweep >= 1) return;
+    const bb = el.getBBox();
+    if (!bb.width) return;
+    grad.setAttribute("x1", bb.x.toFixed(1));
+    grad.setAttribute("x2", (bb.x + bb.width).toFixed(1));
+    const edge = 1.22 * ease.inOut(sweep) - 0.22;
+    const s = grad.querySelectorAll("stop");
+    s[1].setAttribute("offset", clamp(edge, 0, 1).toFixed(4));
+    s[2].setAttribute("offset", clamp(edge + 0.22, 0, 1).toFixed(4));
+  });
+
+  const big = 10000;
+  const fullRect = { x: -big, y: -big, width: 2 * big, height: 2 * big };
+
   return (
     <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
       <defs>
-        <path id={arcId} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
-      </defs>
-      {W > 0 && (
-        <text
-          ref={textRef}
-          className="title"
-          role="heading"
-          aria-level={1}
-          fontSize={size.toFixed(1)}
-          textAnchor="middle"
-          filter={filter}
+        <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
+
+        <radialGradient
+          id={`${uid}-sky`}
+          gradientUnits="userSpaceOnUse"
+          cx={circle.cx}
+          cy={circle.cy}
+          r={maskR}
         >
-          <textPath href={`#${arcId}`} startOffset="50%">
-            {text}
-          </textPath>
-        </text>
+          {stops.map(([t, a]) => (
+            <stop
+              key={t}
+              offset={((lo + (hi - lo) * t) / maskR).toFixed(6)}
+              stopColor="#fff"
+              stopOpacity={a}
+            />
+          ))}
+        </radialGradient>
+        <mask id={`${uid}-sky-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+          <rect {...fullRect} fill={`url(#${uid}-sky)`} />
+        </mask>
+
+        <linearGradient
+          id={`${uid}-sweep`}
+          ref={sweepRef}
+          gradientUnits="userSpaceOnUse"
+          y1={0}
+          y2={0}
+        >
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="0" stopColor="#fff" />
+          <stop offset="0" stopColor="#000" />
+          <stop offset="1" stopColor="#000" />
+        </linearGradient>
+        <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+          <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
+        </mask>
+      </defs>
+
+      {W > 0 && (
+        <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
+          <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
+            <text
+              ref={textRef}
+              className="title"
+              role="heading"
+              aria-level={1}
+              fontSize={size.toFixed(1)}
+              textAnchor="middle"
+              opacity={o > 0.001 ? 1 : 0}
+              filter={filter}
+              mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
+            >
+              <textPath href={`#${uid}-arc`} startOffset="50%">
+                <tspan dy={dy.toFixed(2)}>{text}</tspan>
+              </textPath>
+            </text>
+          </g>
+        </g>
       )}
     </svg>
   );

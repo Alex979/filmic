@@ -1,4 +1,13 @@
 import { createFilmPass, type FilmSettings } from "./film/filmPass";
+import {
+  DEFAULT_FOOTAGE,
+  footageFrame,
+  frameIndex,
+  frameStart,
+  STILL_FRAME,
+  type FootageFrame,
+  type FootageOptions,
+} from "./film/footage";
 import { DEFAULT_FRAME, type FrameOptions } from "./film/frame";
 import { DEFAULT_DUST, type DustOptions } from "./film/dust";
 import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
@@ -6,6 +15,13 @@ import { DEFAULT_MOTTLE, type MottleOptions } from "./film/mottle";
 import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
 import type { Source, SourceContext, SourceInstance, View } from "./source";
 import { testPattern } from "./sources/testPattern";
+import {
+  attachElement,
+  syncAnimations,
+  type AttachOptions,
+  type FrameEvent,
+  type FrameListener,
+} from "./dom/sync";
 
 /**
  * Settings that can be changed at any time with `film.set()`. Each group is
@@ -23,6 +39,8 @@ export interface FilmUpdate {
   grain?: Partial<GrainOptions>;
   /** Specks, fibers and hairs on the film. */
   dust?: Partial<DustOptions>;
+  /** Play as footage: frame rate, weave, flicker, per-frame grain and dust. */
+  footage?: Partial<FootageOptions>;
 }
 
 export interface FilmOptions extends FilmUpdate {
@@ -41,6 +59,29 @@ export interface Film {
   readonly settings: Readonly<FilmSettings>;
   /** Schedule a redraw on the next animation frame. */
   render(): void;
+  /**
+   * Listen for each drawn frame: its footage frame number and time, weave and
+   * flicker. Runs in the same animation frame as the draw, so DOM changes made
+   * here appear together with it. Returns a function that stops listening.
+   */
+  on(event: "frame", listener: FrameListener): () => void;
+  /**
+   * `now` (default: performance.now()) stepped to the start of its footage
+   * frame while footage plays, or unchanged otherwise. Animations timed with
+   * it step in sync with the film.
+   */
+  frameTime(now?: number): number;
+  /**
+   * Move an element with the film each frame (weave and flicker) and boil an
+   * ink filter's noise. Takes over the element's transform and filter, so use
+   * a wrapper. Returns a function that detaches it.
+   */
+  attach(element: HTMLElement | SVGElement, options?: AttachOptions): () => void;
+  /**
+   * Step an element's CSS animations and transitions at the footage frame
+   * rate while footage plays. Returns a function that stops syncing.
+   */
+  sync(element: Element): () => void;
   /** Stop rendering and release GPU resources. */
   destroy(): void;
 }
@@ -71,6 +112,7 @@ export function createFilm(
     mottle: { ...DEFAULT_MOTTLE, ...options.mottle },
     grain: { ...DEFAULT_GRAIN, ...options.grain },
     dust: { ...DEFAULT_DUST, ...options.dust },
+    footage: { ...DEFAULT_FOOTAGE, ...options.footage },
   };
 
   const view: View = {
@@ -81,9 +123,23 @@ export function createFilm(
     bufferHeight: 0,
   };
 
-  // --- Render loop: draw at most once per frame, and only when asked ---
+  // --- Render loop ---
+  // As a still, draw at most once per animation frame, and only when asked.
+  // As footage, also draw whenever the page clock reaches a new film frame.
   let frame = 0;
   let destroyed = false;
+  let current: FootageFrame = STILL_FRAME;
+  const listeners = new Set<FrameListener>();
+  const subscribe = (listener: FrameListener) => {
+    listeners.add(listener);
+    return () => {
+      listeners.delete(listener);
+    };
+  };
+
+  // Footage plays only while the canvas is on screen.
+  let onScreen = true;
+  const playing = () => settings.footage.enabled && onScreen;
 
   const draw = () => {
     frame = 0;
@@ -93,15 +149,65 @@ export function createFilm(
     const sourceFrame = source.render(view);
 
     // Pass 2: the film pass reads that texture and draws to the screen.
-    filmPass.draw(sourceFrame, view, settings);
+    const film = filmPass.draw(sourceFrame, view, settings, current);
+
+    if (!listeners.size) return;
+    const isPlaying = current !== STILL_FRAME;
+    const { fps } = settings.footage;
+    const event: FrameEvent = {
+      playing: isPlaying,
+      n: current.n,
+      time: isPlaying ? frameStart(performance.now(), fps) : performance.now(),
+      fps,
+      // Film px -> CSS px, so they can be used as CSS lengths.
+      dx: current.dx / film.scale,
+      dy: current.dy / film.scale,
+      rotation: current.rotation,
+      origin: [
+        film.rect.x + film.rect.width / 2,
+        film.rect.y + film.rect.height / 2,
+      ],
+      exposure: current.exposure,
+      brightness: Math.pow(current.exposure, 1 / 2.2),
+    };
+    listeners.forEach((listener) => listener(event));
   };
 
   const render = () => {
     if (!frame && !destroyed) frame = requestAnimationFrame(draw);
   };
 
-  // Sources can ask for redraws themselves (an image loaded, a new video frame).
-  const context: SourceContext = { requestRender: render };
+  // While footage plays, watch the page clock and draw each new film frame.
+  let tick = 0;
+  const loop = () => {
+    tick = 0;
+    if (destroyed || !playing()) return;
+    const n = frameIndex(performance.now(), settings.footage.fps);
+    if (current === STILL_FRAME || n !== current.n) {
+      current = footageFrame(n, settings.footage);
+      cancelAnimationFrame(frame);
+      draw();
+    }
+    tick = requestAnimationFrame(loop);
+  };
+  const updatePlayback = () => {
+    if (playing()) {
+      if (!tick) tick = requestAnimationFrame(loop);
+    } else {
+      cancelAnimationFrame(tick);
+      tick = 0;
+      current = STILL_FRAME;
+    }
+  };
+
+  // Sources can ask for redraws themselves (an image loaded, a new video
+  // frame). While footage plays, the next film frame picks the change up, so
+  // live sources are filmed at the footage frame rate like everything else.
+  const context: SourceContext = {
+    requestRender: () => {
+      if (!playing()) render();
+    },
+  };
   let source: SourceInstance = (options.source ?? testPattern()).create(
     gl,
     context,
@@ -134,6 +240,13 @@ export function createFilm(
     cancelAnimationFrame(frame);
     draw();
   });
+  const visibility = new IntersectionObserver(([entry]) => {
+    onScreen = entry.isIntersecting;
+    updatePlayback();
+    render();
+  });
+  visibility.observe(canvas);
+
   try {
     // Also fires when only the pixel ratio changes (browser zoom, moving
     // the window to another monitor).
@@ -156,6 +269,13 @@ export function createFilm(
         settings.mottle = { ...settings.mottle, ...update.mottle };
       if (update.grain) settings.grain = { ...settings.grain, ...update.grain };
       if (update.dust) settings.dust = { ...settings.dust, ...update.dust };
+      if (update.footage) {
+        settings.footage = { ...settings.footage, ...update.footage };
+        // New settings (e.g. weave) apply from the current frame on.
+        if (current !== STILL_FRAME)
+          current = footageFrame(current.n, settings.footage);
+        updatePlayback();
+      }
       render();
     },
     get settings(): FilmSettings {
@@ -170,13 +290,33 @@ export function createFilm(
         mottle: { ...settings.mottle },
         grain: { ...settings.grain },
         dust: { ...settings.dust },
+        footage: { ...settings.footage },
       };
     },
     render,
+    on(_event, listener) {
+      return subscribe(listener);
+    },
+    frameTime(now = performance.now()) {
+      return playing() ? frameStart(now, settings.footage.fps) : now;
+    },
+    attach(element, attachOptions) {
+      const detach = attachElement(element, canvas, subscribe, attachOptions);
+      render();
+      return detach;
+    },
+    sync(element) {
+      const stop = syncAnimations(element, subscribe);
+      render();
+      return stop;
+    },
     destroy() {
       destroyed = true;
       cancelAnimationFrame(frame);
+      cancelAnimationFrame(tick);
       observer.disconnect();
+      visibility.disconnect();
+      listeners.clear();
       source.dispose();
       filmPass.dispose();
       // The context itself belongs to the canvas and is left alone, so the

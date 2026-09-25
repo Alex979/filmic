@@ -1,6 +1,7 @@
 import GUI from "lil-gui";
 import {
   DEFAULT_DUST,
+  DEFAULT_FOOTAGE,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
   DEFAULT_INK,
@@ -16,6 +17,10 @@ interface TitleControls {
   text: string;
   setText(text: string): void;
   setPlain(plain: boolean): void;
+  /** Boil the ink's noise every footage frame. */
+  setBoil(on: boolean): void;
+  /** Play the intro again. */
+  replay(): void;
 }
 
 /** A tuning panel for a film. Returns the panel so the caller can destroy it. */
@@ -134,6 +139,28 @@ export function createControls(film: Film, title: TitleControls): GUI {
   t.add(ink, "firmness", 0.5, 3, 0.01).onChange(applyInk);
   t.add(ink, "pinholes", 0, 0.6, 0.005).onChange(applyInk);
   t.add(ink, "seed", 0, 100, 1).onChange(applyInk);
+
+  // --- Footage ---
+  const footage = { ...s.footage };
+  const boil = { on: true };
+  const applyFootage = () => film.set({ footage });
+  const fo = gui.addFolder("Footage");
+  fo.add(footage, "enabled").name("animated").onChange(applyFootage);
+  fo.add(footage, "fps", 1, 60, 1).name("frame rate (fps)").onChange(applyFootage);
+  fo.add(footage, "grain").name("new grain every frame").onChange(applyFootage);
+  fo.add(boil, "on")
+    .name("boil title ink")
+    .onChange((on: boolean) => title.setBoil(on));
+  fo.add(footage, "weave", 0, 4, 0.01).name("weave (film px)").onChange(applyFootage);
+  fo.add(footage, "weaveRotation", 0, 0.2, 0.001)
+    .name("weave rotation (deg)")
+    .onChange(applyFootage);
+  fo.add(footage, "flicker", 0, 0.2, 0.001).onChange(applyFootage);
+  fo.add(footage, "dustRate", 0, 240, 1).name("dust per frame").onChange(applyFootage);
+  fo.add(footage, "dustLinger", 0, 1, 0.01).name("dust linger chance").onChange(applyFootage);
+  fo.add(footage, "seed", 0, 100, 1).onChange(applyFootage);
+  fo.add(title, "replay").name("replay intro");
+
   gui
     .add(
       {
@@ -156,6 +183,11 @@ export function createControls(film: Film, title: TitleControls): GUI {
           titleState.on = true;
           title.setPlain(false);
           applyInk();
+          // This example plays as footage by default.
+          Object.assign(footage, DEFAULT_FOOTAGE, { enabled: true });
+          boil.on = true;
+          title.setBoil(true);
+          applyFootage();
           refresh(gui);
           applyFrame();
           applyOptics();
