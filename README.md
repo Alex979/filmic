@@ -249,6 +249,11 @@ requestAnimationFrame(tick);
 `film.on("frame", (frame) => …)` runs on every drawn frame, with its number,
 time, weave and flicker, for anything else.
 
+Things that follow the user, like the scroll position or the pointer, feel
+laggy at 12 fps. Keep them at the screen's rate: call `film.render()` when
+they change. A redraw between footage frames keeps that frame's grain, weave
+and flicker, and only the picture moves.
+
 ## React
 
 filmic doesn't need a wrapper: create the film in an effect and destroy it in

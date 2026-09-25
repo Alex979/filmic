@@ -40,7 +40,7 @@ Throws if WebGL 2 isn't available.
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `set(update)`                   | Change settings or the source. Each group is merged into the current one; omitted fields keep their value.   |
 | `settings`                      | A read-only copy of the current settings (every group, fully filled in).                                     |
-| `render()`                      | Redraw on the next animation frame. Needed after drawing to a canvas source that isn't `live`.               |
+| `render()`                      | Redraw on the next animation frame. Needed after drawing to a canvas source that isn't `live`. While footage plays, a redraw between footage frames keeps that frame's grain, weave and flicker and only updates the picture. |
 | `on("frame", listener)`         | Run `listener` on every drawn frame. Returns an unsubscribe function. See [frame events](#frame-events).       |
 | `frameTime(now?)`               | `now` (default `performance.now()`) stepped to the start of its footage frame while footage plays; else `now`. |
 | `attach(element, options?)`     | Move an element with the film. Returns a detach function. See [attach](#filmattach).                         |

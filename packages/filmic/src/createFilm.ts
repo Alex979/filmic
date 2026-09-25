@@ -60,7 +60,12 @@ export interface Film {
   set(update: FilmUpdate): void;
   /** The current effect settings (read-only snapshot). */
   readonly settings: Readonly<FilmSettings>;
-  /** Schedule a redraw on the next animation frame. */
+  /**
+   * Schedule a redraw on the next animation frame. While footage plays, a
+   * redraw between footage frames keeps the current frame's grain, weave and
+   * flicker and only updates the picture, so things that follow the user
+   * (scroll, the pointer) can move at the screen's rate.
+   */
   render(): void;
   /**
    * Listen for each drawn frame: its footage frame number and time, weave and
@@ -147,6 +152,13 @@ export function createFilm(
 
   const draw = () => {
     frame = 0;
+    // While footage plays, every draw shows the film frame the page clock is
+    // on, including redraws asked for between frames (e.g. on scroll).
+    if (playing()) {
+      const n = frameIndex(performance.now(), settings.footage.fps);
+      if (current === STILL_FRAME || n !== current.n)
+        current = footageFrame(n, settings.footage);
+    }
     if (!view.width || !view.height) return;
 
     // Pass 1: the source renders the scene into a texture.
@@ -188,7 +200,6 @@ export function createFilm(
     if (destroyed || !playing()) return;
     const n = frameIndex(performance.now(), settings.footage.fps);
     if (current === STILL_FRAME || n !== current.n) {
-      current = footageFrame(n, settings.footage);
       cancelAnimationFrame(frame);
       draw();
     }
