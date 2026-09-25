@@ -5,6 +5,7 @@ import { createControls } from "./controls";
 import { createCursor } from "./cursor";
 import { HORIZON_FILM, HORIZON_INK } from "./look";
 import { createPlay } from "./play";
+import { createRipples } from "./ripples";
 import { horizonScene } from "./scene";
 import { createSound, type Sound } from "./sound";
 import { Title } from "./Title";
@@ -129,6 +130,7 @@ export function Showcase() {
     // a drag that starts on the ring moves it along.
     const root = document.documentElement;
     const cursor = createCursor(ink, stage);
+    const ripples = createRipples(film, ink, stage);
     let mouse = matchMedia("(hover: hover)").matches;
     let inside = !mouse; // the pointer is over the page
     let wasFree = false;
@@ -165,9 +167,11 @@ export function Showcase() {
       showCursor();
     };
     let tap: { id: number; x: number; y: number; t: number } | null = null;
-    // A click or tap on the scene chimes, pitched and panned by where.
+    // A click or tap on the scene ripples, and chimes, pitched and panned
+    // by where.
     const chime = (e: PointerEvent) => {
       const { x, y } = onStage(e);
+      ripples.at(x, y);
       sound.chime(x / stage.clientWidth, y / stage.clientHeight);
     };
     const onDown = (e: PointerEvent) => {
@@ -342,6 +346,7 @@ export function Showcase() {
       soundRef.current = null;
       cancelAnimationFrame(raf);
       cursor.destroy();
+      ripples.destroy();
       controls.destroy();
       unsync();
       detach();
