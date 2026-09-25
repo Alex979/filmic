@@ -50,7 +50,7 @@ interface TitleProps {
  * sweeps across from left to right to reveal it.
  */
 export function Title({ text, rise, filter, glow, children }: TitleProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<SVGTextElement>(null);
   const sweepRef = useRef<SVGLinearGradientElement>(null);
   const uid = useId().replace(/[^\w-]/g, "");
@@ -59,13 +59,14 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
   // Text width per 1px of font size, so long titles can shrink to fit.
   const [widthPerPx, setWidthPerPx] = useState(0);
 
+  // The title is laid out over its container (the same box as the canvas).
   useLayoutEffect(() => {
-    const svg = svgRef.current!;
+    const container = glowRef.current!.parentElement!;
     const observer = new ResizeObserver(([entry]) => {
       const box = entry.contentBoxSize[0];
       setView({ W: box.inlineSize, H: box.blockSize });
     });
-    observer.observe(svg);
+    observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
@@ -109,7 +110,7 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
   const travel = ease.inOut(o) * (bandH + 0.3 * size);
   const lo = circle.r - travel;
   const hi = circle.r + bandH - travel;
-  const maskR = hi + 1;
+  const maskR = Math.max(1, hi + 1); // never negative, even before the first measure
   const stops: [number, number][] = [
     [0, 0],
     [0.35, 0.18],
@@ -135,13 +136,26 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
     s[2].setAttribute("offset", clamp(edge + 0.22, 0, 1).toFixed(4));
   });
 
+  // The title's strip of the screen: from above its tallest letters to below
+  // the apex, where it rises from. The SVG and its glow cover only this, not
+  // the whole screen, because the glow is redrawn over its whole area each
+  // time the ink boils, and phones feel every pixel of it. The SVG keeps
+  // screen coordinates (its viewBox starts at the strip's top).
+  const apexY = circle.cy - circle.r;
+  const bandTop = Math.max(0, apexY - 1.35 * size);
+  const bandHeight = Math.max(1, Math.min(H, apexY + 0.9 * size) - bandTop);
+
   const big = 10000;
   const fullRect = { x: -big, y: -big, width: 2 * big, height: 2 * big };
 
   return (
     <>
-      <div className="title-glow" style={{ filter: glow }}>
-        <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
+      <div
+        ref={glowRef}
+        className="title-glow"
+        style={{ filter: glow, top: `${bandTop.toFixed(1)}px`, height: `${bandHeight.toFixed(1)}px` }}
+      >
+        <svg className="overlay" viewBox={`0 ${bandTop.toFixed(1)} ${W || 1} ${bandHeight.toFixed(1)}`}>
           <defs>
             <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
 

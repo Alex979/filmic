@@ -38,17 +38,18 @@ body {
    functions on SVG elements). */
 .title-glow {
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden; /* keeps the glow's area to the strip; the glow itself extends past it */
   pointer-events: none;
 }
 
-/* The title overlay: same box as the canvas, SVG units = CSS px. */
+/* The title overlay: fills the strip, SVG units = CSS px. */
 .overlay {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
   pointer-events: none;
 }
 
@@ -62,8 +63,9 @@ body {
   justify-content: center;
 }
 
-/* HTML subheading. */
+/* HTML subheading. Only as wide as its text, so its glow's area is too. */
 .subtitle {
+  width: fit-content;
   max-width: 90%;
   margin: 0;
   font-family: var(--serif);
