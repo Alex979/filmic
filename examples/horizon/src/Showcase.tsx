@@ -455,7 +455,7 @@ export function Showcase() {
                 // Plain HTML text with the same ink. The paragraph glows and
                 // animates in; the span inside it is inked.
                 <p key={introKey} className="subtitle" style={{ filter: glow }}>
-                  <span style={{ filter }}>A procedural film look for the web</span>
+                  <span style={{ filter }}>Beautiful, procedural film effects for web</span>
                 </p>
               )}
             </Title>
