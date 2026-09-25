@@ -1,5 +1,6 @@
 import { createProgram, FULLSCREEN_VERT, type Uniforms } from "./core/gl";
 import { createRenderTarget } from "./core/target";
+import type { Rect } from "./film/frame";
 
 /** Size information for the frame being drawn. */
 export interface View {
@@ -20,7 +21,17 @@ export interface View {
  * WebGL context, so the same Source can be used by several canvases.
  */
 export interface Source {
-  create(gl: WebGL2RenderingContext): SourceInstance;
+  create(gl: WebGL2RenderingContext, context: SourceContext): SourceInstance;
+}
+
+/** What the film gives a source instance, besides the GL context. */
+export interface SourceContext {
+  /**
+   * Ask for a redraw on the next animation frame, e.g. when an image finishes
+   * loading or a video has a new frame. Calling it from `render` keeps the
+   * film redrawing every frame, for sources that are always changing.
+   */
+  requestRender(): void;
 }
 
 export interface SourceInstance {
@@ -44,6 +55,12 @@ export interface SourceFrame {
   texture: WebGLTexture;
   uvScale: [number, number];
   uvOffset: [number, number];
+  /**
+   * Where the source's picture sits on the canvas, in CSS px, if it has one
+   * (an image laid out with cover or contain). The film frame follows it when
+   * `frame.fit` is "source", so effects scale with the picture.
+   */
+  rect?: Rect;
 }
 
 /**

@@ -9,7 +9,7 @@ export { createFilm } from "./createFilm";
 export type { Film, FilmOptions, FilmUpdate } from "./createFilm";
 export type { FilmSettings } from "./film/filmPass";
 
-export { DEFAULT_FRAME, resolveFrame } from "./film/frame";
+export { DEFAULT_FRAME, fitRect, resolveFrame } from "./film/frame";
 export type { FrameOptions, FrameFit, Rect } from "./film/frame";
 export { DEFAULT_OPTICS } from "./film/optics";
 export type { OpticsOptions } from "./film/optics";
@@ -19,6 +19,7 @@ export type { GrainOptions } from "./film/grain";
 export { shaderSource } from "./source";
 export type {
   Source,
+  SourceContext,
   SourceInstance,
   SourceFrame,
   View,
@@ -35,4 +36,9 @@ export type {
   HorizonStop,
   Circle,
 } from "./sources/horizonGradient";
+export { elementSource } from "./sources/elementSource";
+export type {
+  ElementSourceOptions,
+  FilmableElement,
+} from "./sources/elementSource";
 export { testPattern } from "./sources/testPattern";

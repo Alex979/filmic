@@ -10,7 +10,10 @@ export interface Rect {
 
 /**
  * How the film frame is laid over the canvas. Mirrors CSS object-fit:
- * - "cover": fill the canvas, cropping the frame (default)
+ * - "source": wherever the source put its image (e.g. an elementSource laid
+ *   out with cover or contain), so effects scale with the picture. Sources
+ *   without an image of their own fall back to "cover". (default)
+ * - "cover": fill the canvas, cropping the frame
  * - "contain": fit the whole frame inside the canvas
  * - "fill": exactly the canvas
  * - "screen": exactly the canvas, and 1 film px = 1 CSS px, so effects keep a
@@ -18,7 +21,12 @@ export interface Rect {
  * - a function returning the frame's rect, for any other layout
  */
 export type FrameFit =
-  "cover" | "contain" | "fill" | "screen" | ((view: View) => Rect);
+  | "source"
+  | "cover"
+  | "contain"
+  | "fill"
+  | "screen"
+  | ((view: View) => Rect);
 
 /**
  * The film frame: the piece of film being projected onto the canvas. Effects
@@ -37,11 +45,37 @@ export interface FrameOptions {
 }
 
 export const DEFAULT_FRAME: FrameOptions = {
-  fit: "cover",
+  fit: "source",
   aspect: 16 / 9,
   anchor: [0.5, 0.5],
   resolution: 1080,
 };
+
+/**
+ * Lay a box of the given aspect ratio over a `width` x `height` area, like CSS
+ * object-fit + object-position: "cover" fills the area (cropping), "contain"
+ * fits inside it (leaving bars), "fill" stretches to it. `anchor` pins the box
+ * when it doesn't match: [0, 0] top-left, [0.5, 0.5] centered.
+ */
+export function fitRect(
+  width: number,
+  height: number,
+  aspect: number,
+  fit: "cover" | "contain" | "fill",
+  anchor: [number, number] = [0.5, 0.5],
+): Rect {
+  if (fit === "fill") return { x: 0, y: 0, width, height };
+  const areaIsWider = width / height > aspect;
+  const matchWidth = fit === "cover" ? areaIsWider : !areaIsWider;
+  const w = matchWidth ? width : height * aspect;
+  const h = matchWidth ? width / aspect : height;
+  return {
+    x: (width - w) * anchor[0],
+    y: (height - h) * anchor[1],
+    width: w,
+    height: h,
+  };
+}
 
 export interface ResolvedFrame {
   rect: Rect;
@@ -49,35 +83,29 @@ export interface ResolvedFrame {
   scale: number;
 }
 
-export function resolveFrame(view: View, frame: FrameOptions): ResolvedFrame {
+/**
+ * Where the film frame sits for this view. `sourceRect` is where the source
+ * says its image is (see SourceFrame.rect), used by the "source" fit.
+ */
+export function resolveFrame(
+  view: View,
+  frame: FrameOptions,
+  sourceRect?: Rect,
+): ResolvedFrame {
   const W = view.width;
   const H = view.height;
   const fit = frame.fit;
+  const byHeight = (rect: Rect) => ({
+    rect,
+    scale: frame.resolution / Math.max(rect.height, 1e-3),
+  });
 
-  if (typeof fit === "function") {
-    const rect = fit(view);
-    return { rect, scale: frame.resolution / Math.max(rect.height, 1e-3) };
-  }
+  if (typeof fit === "function") return byHeight(fit(view));
+  if (fit === "source" && sourceRect) return byHeight(sourceRect);
   if (fit === "screen") {
     return { rect: { x: 0, y: 0, width: W, height: H }, scale: 1 };
   }
-  if (fit === "fill") {
-    return {
-      rect: { x: 0, y: 0, width: W, height: H },
-      scale: frame.resolution / Math.max(H, 1e-3),
-    };
-  }
-
-  // cover / contain: scale the frame uniformly, then pin it with `anchor`.
-  const canvasIsWider = W / H > frame.aspect;
-  const matchWidth = fit === "cover" ? canvasIsWider : !canvasIsWider;
-  const width = matchWidth ? W : H * frame.aspect;
-  const height = matchWidth ? W / frame.aspect : H;
-  const rect = {
-    x: (W - width) * frame.anchor[0],
-    y: (H - height) * frame.anchor[1],
-    width,
-    height,
-  };
-  return { rect, scale: frame.resolution / height };
+  return byHeight(
+    fitRect(W, H, frame.aspect, fit === "source" ? "cover" : fit, frame.anchor),
+  );
 }

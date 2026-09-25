@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16213d"/>
+      <stop offset="0.45" stop-color="#5a5f86"/>
+      <stop offset="0.75" stop-color="#d98a5a"/>
+      <stop offset="1" stop-color="#f3c27e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff1cf" stop-opacity="0.9"/>
+      <stop offset="0.35" stop-color="#ffd39a" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#ffb070" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="lake" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e5a86f"/>
+      <stop offset="0.4" stop-color="#6c5a74"/>
+      <stop offset="1" stop-color="#1a1c2c"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="640" fill="url(#sky)"/>
+  <circle cx="1040" cy="480" r="300" fill="url(#glow)"/>
+  <circle cx="1040" cy="480" r="58" fill="#fff4dc"/>
+  <path d="M0 560 L140 470 L260 520 L420 400 L560 505 L700 455 L820 530 L980 470 L1120 540 L1260 450 L1420 520 L1600 430 L1600 640 L0 640 Z" fill="#7b6080"/>
+  <path d="M0 600 L180 520 L330 585 L500 500 L660 590 L860 540 L1040 610 L1220 530 L1400 600 L1600 540 L1600 640 L0 640 Z" fill="#4a3b58"/>
+  <path d="M0 640 L0 610 L120 580 L260 625 L420 590 L600 632 L780 600 L960 636 L1150 604 L1330 630 L1480 598 L1600 620 L1600 640 Z" fill="#2a2236"/>
+  <rect y="640" width="1600" height="360" fill="url(#lake)"/>
+  <g fill="#fff4dc" opacity="0.8">
+    <rect x="1000" y="660" width="80" height="4" rx="2"/>
+    <rect x="975" y="690" width="130" height="3" rx="1.5"/>
+    <rect x="1010" y="720" width="60" height="3" rx="1.5"/>
+    <rect x="960" y="760" width="160" height="2" rx="1"/>
+  </g>
+  <path d="M0 1000 L0 900 Q260 860 520 905 T1040 890 T1600 870 L1600 1000 Z" fill="#0f0d14"/>
+  <g fill="none" stroke="#1d1826" stroke-width="5" stroke-linecap="round">
+    <path d="M300 250 q18 -14 36 0 q18 -14 36 0"/>
+    <path d="M380 300 q12 -9 24 0 q12 -9 24 0"/>
+    <path d="M250 330 q10 -8 20 0 q10 -8 20 0"/>
+  </g>
+</svg>

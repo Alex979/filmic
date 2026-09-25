@@ -2,7 +2,7 @@ import { createFilmPass, type FilmSettings } from "./film/filmPass";
 import { DEFAULT_FRAME, type FrameOptions } from "./film/frame";
 import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
 import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
-import type { Source, View } from "./source";
+import type { Source, SourceContext, SourceInstance, View } from "./source";
 import { testPattern } from "./sources/testPattern";
 
 /**
@@ -58,7 +58,6 @@ export function createFilm(
   });
   if (!gl) throw new Error("filmic: WebGL2 is not available");
 
-  let source = (options.source ?? testPattern()).create(gl);
   const filmPass = createFilmPass(gl);
   const settings: FilmSettings = {
     frame: { ...DEFAULT_FRAME, ...options.frame },
@@ -92,6 +91,13 @@ export function createFilm(
   const render = () => {
     if (!frame && !destroyed) frame = requestAnimationFrame(draw);
   };
+
+  // Sources can ask for redraws themselves (an image loaded, a new video frame).
+  const context: SourceContext = { requestRender: render };
+  let source: SourceInstance = (options.source ?? testPattern()).create(
+    gl,
+    context,
+  );
 
   // --- Sizing: keep the drawing buffer matched to the canvas's on-screen size ---
   const observer = new ResizeObserver(([entry]) => {
@@ -133,7 +139,7 @@ export function createFilm(
       if (destroyed) return;
       if (update.source) {
         source.dispose();
-        source = update.source.create(gl);
+        source = update.source.create(gl, context);
       }
       if (update.frame) settings.frame = { ...settings.frame, ...update.frame };
       if (update.optics)

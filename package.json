@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "dev": "bun --filter horizon dev",
-    "build": "bun --filter horizon build",
+    "playground": "bun --filter playground dev",
+    "build": "bun --filter './examples/*' build",
     "typecheck": "bun --filter filmic typecheck",
     "lint": "oxlint"
   },

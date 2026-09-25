@@ -7,10 +7,11 @@ photo, eventually a whole page) rendered as if it were shot on film and projecte
 
 ```
 packages/filmic/     the library: framework-agnostic TypeScript, public API in src/index.ts
-examples/horizon/    Vite + React demo that uses the library
+examples/horizon/    a sunset horizon hero, the library's reference scene
+examples/playground/ one card per kind of source (image, shader, 2D canvas, video, Three.js)
 ```
 
-The example depends on the library as `"filmic": "workspace:*"` and imports its
+The examples depend on the library as `"filmic": "workspace:*"` and import its
 TypeScript source directly, so there's no build step while developing.
 
 ## Run
@@ -18,8 +19,9 @@ TypeScript source directly, so there's no build step while developing.
 ```bash
 bun install
 bun dev          # examples/horizon
+bun playground   # examples/playground
 bun typecheck    # type-check the library
-bun run build    # build the example
+bun run build    # build the examples
 bun lint
 ```
 
@@ -33,7 +35,8 @@ bun lint
 - [x] Grain: procedural, brightness-dependent, with edge breakup
 - [x] Optics: lens/emulsion blur (separable gaussian)
 - [x] Live settings: `film.set()`
-- [ ] `elementSource`: film any canvas (2D, p5, Pixi, Three…), video or image
+- [x] `elementSource`: film any canvas (2D, p5, Pixi, Three…), video or image, with object-fit
+- [x] Playground example: every kind of source in resizable cards
 - [ ] Mottle: low-frequency blotches
 - [ ] Look: tone curve, halation, vignette
 - [ ] Dust: procedural specks and hairs

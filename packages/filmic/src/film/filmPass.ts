@@ -79,7 +79,7 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
 
   return {
     draw(sourceFrame, view, { frame: frameOptions, optics, grain }) {
-      const film = resolveFrame(view, frameOptions);
+      const film = resolveFrame(view, frameOptions, sourceFrame.rect);
 
       // Passes that render into textures come first, before targeting the screen:
       // the optical blur, and regenerating grain if its settings changed.
