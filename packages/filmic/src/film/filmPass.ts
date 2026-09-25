@@ -21,6 +21,7 @@ import { createOptics, type OpticsOptions } from "./optics";
 import {
   createHalation,
   HALATION_GLSL,
+  type HaloFrame,
   type HalationOptions,
 } from "./halation";
 
@@ -133,6 +134,16 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
   const opticsPasses = createOptics(gl);
   const halation = createHalation(gl);
 
+  // The blurred picture and its halation depend only on the source's picture,
+  // the view and their settings, so they're kept from draw to draw while none
+  // of those change (e.g. footage frames over a still image).
+  let picture: {
+    key: string;
+    texture: WebGLTexture;
+    frame: SourceFrame;
+    halo: HaloFrame | null;
+  } | null = null;
+
   return {
     draw(
       sourceFrame,
@@ -153,8 +164,29 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
       // Passes that render into textures come first, before targeting the screen:
       // the optical blur, halation, dust, and regenerating noise if its
       // settings changed.
-      const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
-      const halo = halation.render(frame, view, halationOptions, film.scale);
+      const key =
+        sourceFrame.version === undefined
+          ? null
+          : [
+              sourceFrame.version,
+              sourceFrame.uvScale,
+              sourceFrame.uvOffset,
+              view.bufferWidth,
+              view.bufferHeight,
+              view.width,
+              view.height,
+              film.scale,
+              optics.blur,
+              halationOptions.amount,
+              halationOptions.threshold,
+              halationOptions.radius,
+            ].join("|");
+      if (!picture || key === null || key !== picture.key || picture.texture !== sourceFrame.texture) {
+        const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
+        const halo = halation.render(frame, view, halationOptions, film.scale);
+        picture = { key: key ?? "", texture: sourceFrame.texture, frame, halo };
+      }
+      const { frame, halo } = picture;
       grainTexture.update(grain.seed, grain.softness, grain.sharpness);
       mottleTexture.update(mottle.seed);
       const dustTexture = dust.render(view, film, dustOptions, footage, current.n);

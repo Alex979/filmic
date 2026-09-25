@@ -66,6 +66,13 @@ export interface SourceFrame {
    * `frame.fit` is "source", so effects scale with the picture.
    */
   rect?: Rect;
+  /**
+   * Changes whenever the texture's contents change. While it stays the same
+   * (with the same texture and view), the film skips the passes that only
+   * depend on the picture: the optical blur and halation. Leave it out for a
+   * texture that may change on every render.
+   */
+  version?: number;
 }
 
 /**

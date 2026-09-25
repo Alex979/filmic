@@ -252,12 +252,22 @@ interface SourceFrame {
   uvScale: [number, number]; // the film pass samples at screenUv * uvScale + uvOffset
   uvOffset: [number, number]; // (screen UV: (0, 0) bottom-left)
   rect?: Rect; // where the picture sits on the canvas, for frame.fit "source"
+  version?: number; // changes when the texture's contents change
 }
 ```
 
 `context.requestRender()` asks for a redraw (e.g. when new content arrives).
 A texture rendered at canvas size uses scale `[1, 1]` and offset `[0, 0]`; an
 uploaded image, whose first row is its top, uses `[1, -1]` and `[0, 1]`.
+
+The film reads the texture as linear light. An `SRGB8_ALPHA8` texture (what
+filmic's own sources render into) is decoded by the GPU as it's read, so it
+works as is; any other format must hold linear values.
+
+`version` lets the film skip work: while the same texture comes back with the
+same `version` (and the canvas hasn't resized), the optical blur and halation
+aren't recomputed, only the effects that change every frame. Bump it whenever
+the contents change, or leave it out for a texture that changes every render.
 
 ## DOM
 
