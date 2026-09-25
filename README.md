@@ -325,7 +325,8 @@ This repository is a Bun workspace with two example apps:
 
 ```
 packages/filmic/     the library (public API in src/index.ts)
-examples/horizon/    a sunset hero with a curved title, used to tune the defaults
+examples/horizon/    a sunset hero with a curved title (used to tune the defaults); scroll
+                     down and the title melts into ink that follows the pointer
 examples/playground/ one card per kind of source: image, shader, 2D canvas, video, Three.js
 ```
 

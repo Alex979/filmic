@@ -17,11 +17,24 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+/* One screen, in normal flow, with the page scrolling inside it (see
+   Showcase). The large viewport height keeps it one size while a phone's
+   toolbars come and go. */
 .stage {
   position: relative;
-  width: 100%;
   height: 100lvh;
   overflow: hidden;
+}
+
+/* The page scrolls inside the stage, over a canvas that stays put: the scene
+   follows the scroll itself (see scene.ts). */
+.page {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden; /* layers attached to the film weave a px past the edge */
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  outline: none; /* focused for keyboard scrolling, not to show */
   isolation: isolate;
   /* Only the title and subtitle are selectable. Otherwise a long press that
      misses the text selects the whole hero on iOS. */
@@ -29,13 +42,27 @@ body {
   user-select: none;
 }
 
-/* filmic sizes its drawing buffer to match whatever size CSS gives the canvas. */
+.hero {
+  position: relative;
+  height: 100%;
+}
+
+/* Where the blob plays: just enough scroll to melt the title and tilt down
+   to the planet, with the subtitle left near the top as a heading. */
+.play-area {
+  height: 45%;
+}
+
+/* filmic sizes its drawing buffer to match whatever size CSS gives the
+   canvas. It stops short of the page's scrollbar, if it has one (--gutter,
+   set by Showcase). */
 .film {
   -webkit-touch-callout: none; /* no press-and-hold menu on the canvas */
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
   display: block;
-  width: 100%;
+  width: calc(100% - var(--gutter, 0px));
   height: 100%;
 }
 
@@ -155,4 +182,61 @@ body {
   background: rgb(242 237 228 / 0.92);
   color: #1c1612;
   fill: #1c1612; /* SVG text */
+}
+
+/* The blob's target (see cursor.ts). It follows the pointer directly, so its
+   position isn't animated; only a glide to a tap is. */
+.cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10000; /* over the panel too: with a mouse, it is the pointer */
+  pointer-events: none;
+  will-change: transform;
+}
+
+.cursor.glide {
+  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+.cursor-mark {
+  position: absolute;
+  left: -17px;
+  top: -17px;
+  width: 34px;
+  height: 34px;
+  border: 1.5px solid var(--light);
+  border-radius: 50%;
+  opacity: 0;
+  transform: scale(0.5);
+  transition:
+    opacity 0.3s,
+    transform 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.cursor-mark::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px;
+  border-radius: 50%;
+  background: var(--light);
+}
+
+.cursor.on .cursor-mark {
+  opacity: 0.9;
+  transform: none;
+}
+
+.cursor.on.pressed .cursor-mark {
+  transform: scale(0.8);
+}
+
+/* While the ring stands in for the pointer. */
+.no-cursor,
+.no-cursor * {
+  cursor: none !important;
 }

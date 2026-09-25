@@ -7,11 +7,13 @@ import {
   type ReactNode,
 } from "react";
 import { horizonCircle } from "./horizonGradient";
+import type { Anchor } from "./play";
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
 
 const ease = {
+  in: (t: number) => t * t,
   inOut: (t: number) =>
     t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
   out: (t: number) => 1 - Math.pow(1 - t, 3),
@@ -36,6 +38,17 @@ interface TitleProps {
    * goes on an HTML wrapper: Safari ignores it on SVG elements.
    */
   glow?: string;
+  /**
+   * How melted the title is: 0 = text, 1 = its letters pushed together and
+   * run into one drop of ink (see Play).
+   */
+  melt?: number;
+  /** Film frame, so the melting ink boils with the film. */
+  boil?: number;
+  /** Hide the text (its ink is out as the blob). */
+  hidden?: boolean;
+  /** Where the letters gather as they melt, whenever that moves. */
+  onAnchor?: (anchor: Anchor) => void;
   /** Shown centered just below the horizon's apex (the subheading). */
   children?: ReactNode;
 }
@@ -48,8 +61,22 @@ interface TitleProps {
  * It rises out from behind the planet: a mask centered on the horizon hides
  * whatever is below the rim, the text slides up through it, and a soft edge
  * sweeps across from left to right to reveal it.
+ *
+ * It can also melt: the letters slide together along the arc and shrink,
+ * while a "goo" filter (the ink's roughness, then a growing blur cut back to
+ * a hard edge) rounds them off and runs them into one drop.
  */
-export function Title({ text, rise, filter, glow, children }: TitleProps) {
+export function Title({
+  text,
+  rise,
+  filter,
+  glow,
+  melt = 0,
+  boil = 0,
+  hidden = false,
+  onAnchor,
+  children,
+}: TitleProps) {
   const glowRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<SVGTextElement>(null);
   const sweepRef = useRef<SVGLinearGradientElement>(null);
@@ -142,6 +169,26 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
   // time the ink boils, and phones feel every pixel of it. The SVG keeps
   // screen coordinates (its viewBox starts at the strip's top).
   const apexY = circle.cy - circle.r;
+
+  // --- Melt ---
+  // The letters gather around the middle of the word, a little above the
+  // baseline at the apex.
+  const ax = circle.cx;
+  const ay = apexY - 0.24 * size - 0.3 * size;
+  useLayoutEffect(() => {
+    if (W) onAnchor?.({ x: ax, y: ay, size });
+  }, [W, ax, ay, size, onAnchor]);
+  const m = clamp(melt, 0, 1);
+  const goo = ease.in(m);
+  const squeeze = -0.36 * ease.inOut(m);
+  const shrink = 1 - 0.5 * goo;
+  // The goo, in the text's own px: thicken the strokes, blur them together,
+  // then cut the blur back to an edge about a px wide.
+  const dilate = Math.max(0.01, 0.04 * size * goo);
+  const sigma = 0.35 + 0.1 * size * goo;
+  const firm = Math.max(1.2, 2.4 * sigma);
+  const cut = 0.42;
+
   const bandTop = Math.max(0, apexY - 1.35 * size);
   const bandHeight = Math.max(1, Math.min(H, apexY + 0.9 * size) - bandTop);
 
@@ -194,10 +241,37 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
             <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
               <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
             </mask>
+
+            {m > 0 && (
+              <filter
+                id={`${uid}-melt`}
+                filterUnits="userSpaceOnUse"
+                x={0}
+                y={bandTop.toFixed(1)}
+                width={W || 1}
+                height={bandHeight.toFixed(1)}
+                colorInterpolationFilters="sRGB"
+              >
+                <feTurbulence type="fractalNoise" baseFrequency={0.9} numOctaves={1} seed={4 + (boil % 997)} result="n" />
+                <feDisplacementMap in="SourceGraphic" in2="n" scale={0.7} xChannelSelector="R" yChannelSelector="G" result="rough" />
+                <feMorphology in="rough" operator="dilate" radius={dilate.toFixed(2)} result="fat" />
+                <feGaussianBlur in="fat" stdDeviation={sigma.toFixed(2)} result="soft" />
+                <feComponentTransfer in="soft">
+                  <feFuncA type="linear" slope={firm.toFixed(3)} intercept={(0.5 - firm * cut).toFixed(3)} />
+                </feComponentTransfer>
+              </filter>
+            )}
           </defs>
 
           {W > 0 && (
-            <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
+            <g
+              mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}
+              transform={
+                m > 0
+                  ? `translate(${ax.toFixed(1)} ${ay.toFixed(1)}) scale(${shrink.toFixed(4)}) translate(${(-ax).toFixed(1)} ${(-ay).toFixed(1)})`
+                  : undefined
+              }
+            >
               <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
                 <text
                   ref={textRef}
@@ -206,8 +280,9 @@ export function Title({ text, rise, filter, glow, children }: TitleProps) {
                   aria-level={1}
                   fontSize={size.toFixed(1)}
                   textAnchor="middle"
-                  opacity={o > 0.001 ? 1 : 0}
-                  style={{ filter }}
+                  opacity={o > 0.001 && !hidden ? 1 : 0}
+                  letterSpacing={m > 0 ? `${squeeze.toFixed(4)}em` : undefined}
+                  style={{ filter: m > 0 ? `url(#${uid}-melt)` : filter }}
                   mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
                 >
                   <textPath href={`#${uid}-arc`} startOffset="50%">

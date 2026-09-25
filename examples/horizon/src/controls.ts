@@ -85,9 +85,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
     .onChange(applyOptics);
 
   // --- Halation ---
-  // Off here by default (the background already has film's colors), but
-  // sliders start from the library defaults so turning it on shows something.
-  const halation = { ...DEFAULT_HALATION };
+  const halation = { ...s.halation };
   const halationState = { on: s.halation.amount > 0 };
   const applyHalation = () =>
     film.set({
@@ -213,8 +211,8 @@ export function createControls(film: Film, title: TitleControls): GUI {
             resolution: DEFAULT_FRAME.resolution,
           });
           Object.assign(optics, DEFAULT_OPTICS);
-          Object.assign(halation, DEFAULT_HALATION);
-          halationState.on = HORIZON_FILM.halation.amount > 0;
+          Object.assign(halation, DEFAULT_HALATION, HORIZON_FILM.halation);
+          halationState.on = true;
           Object.assign(mottle, DEFAULT_MOTTLE);
           mottleState.on = true;
           Object.assign(grain, DEFAULT_GRAIN);

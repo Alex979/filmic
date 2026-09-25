@@ -1,4 +1,4 @@
-import { hexToLinear, shaderSource, type Hex } from "filmic";
+import type { Hex } from "filmic";
 
 /**
  * A planet's horizon at sunset, seen from high up.
@@ -54,8 +54,10 @@ export const HORIZON_TABLE: HorizonRow[] = [
   [0.55468, ["#141519", "#0b0f13", "#0c0f13", "#0f1115", "#111116"]],
 ];
 
-const MAX_ROWS = 24;
-const COLUMNS = 5;
+/** Most rows the scene's shader takes. */
+export const MAX_ROWS = 24;
+/** Colors per row, along the horizon. */
+export const COLUMNS = 5;
 
 // --- Layout ---
 // The scene is placed like a 16:9 photo whose horizon apex sits 49.1% down
@@ -63,7 +65,7 @@ const COLUMNS = 5;
 // frame heights along the arc.
 const APEX_IN_FRAME = 0.4913;
 const RADIUS = 5.6191;
-const ARC_SPAN = 1.9418;
+export const ARC_SPAN = 1.9418;
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
@@ -113,58 +115,39 @@ export function horizonCircle(width: number, height: number): Circle {
   return { cx, cy, r };
 }
 
-export function horizonGradient(table: HorizonRow[] = HORIZON_TABLE) {
-  const rows = table.slice(0, MAX_ROWS);
-  const at = new Float32Array(MAX_ROWS);
-  const colors = new Float32Array(MAX_ROWS * COLUMNS * 3);
-  rows.forEach(([h, row], i) => {
-    at[i] = h;
-    row.forEach((hex, j) => colors.set(hexToLinear(hex), (i * COLUMNS + j) * 3));
-  });
+// --- Scrolling ---
+// Scrolling down tilts the camera down toward the planet and flies it
+// forward. The horizon is far away, so it rises slower than the page; the
+// ground turns toward it, fastest nearest the camera.
 
-  return shaderSource(
-    /* glsl */ `
-uniform vec4 uHorizon;   // circle center xy, radius (CSS px), CSS px per frame height
-uniform int uRowCount;
-uniform float uRowAt[${MAX_ROWS}];                   // heights, frame heights
-uniform vec3 uRowColor[${MAX_ROWS * COLUMNS}];       // linear light, ${COLUMNS} per row
+/** How far the horizon rises per px scrolled. */
+export const PARALLAX = 0.36;
+/**
+ * How far the ground at the bottom of the screen moves per px scrolled, on
+ * top of the horizon's rise: together they keep up with the page.
+ */
+const FLOW = 0.64;
 
-const int COLUMNS = ${COLUMNS};
-const float ARC_SPAN = ${ARC_SPAN.toFixed(4)};
-
-// Row i's color at column position x (0..COLUMNS-1, fractional).
-vec3 rowColor(int i, float x) {
-  int j = min(int(x), COLUMNS - 2);
-  return mix(uRowColor[i * COLUMNS + j], uRowColor[i * COLUMNS + j + 1], x - float(j));
+/** The horizon after scrolling `scroll` CSS px down the page. */
+export interface HorizonView extends HorizonGeometry {
+  /** How far the planet has turned toward the horizon, in radians. */
+  spin: number;
 }
 
-void main() {
-  vec2 d = filmPx() - uHorizon.xy;
-
-  // Height above the horizon, and position along it (0 = left end of the
-  // table's arc, 1 = right end, the screen's center always at 0.5).
-  float h = (length(d) - uHorizon.z) / uHorizon.w;
-  float along = uHorizon.z * atan(d.x, -d.y) / uHorizon.w;
-  float x = clamp(.5 + along / ARC_SPAN, 0., 1.) * float(COLUMNS - 1);
-
-  // Find the two rows around h and blend between them (in linear light).
-  vec3 c = rowColor(0, x);
-  for (int i = 1; i < ${MAX_ROWS}; i++) {
-    if (i >= uRowCount) break;
-    if (h > uRowAt[i - 1]) {
-      float t = clamp((h - uRowAt[i - 1]) / (uRowAt[i] - uRowAt[i - 1]), 0., 1.);
-      c = mix(rowColor(i - 1, x), rowColor(i, x), t);
-    }
-  }
-
-  fragColor = vec4(linearToSrgb(c), 1.);
-}`,
-    (gl, u, view) => {
-      const g = horizonGeometry(view.width, view.height);
-      gl.uniform4f(u.uHorizon, g.cx, g.cy, g.r, g.scale);
-      gl.uniform1i(u.uRowCount, rows.length);
-      gl.uniform1fv(u.uRowAt, at);
-      gl.uniform3fv(u.uRowColor, colors);
-    },
-  );
+export function horizonView(
+  width: number,
+  height: number,
+  scroll: number,
+): HorizonView {
+  const g = horizonGeometry(width, height);
+  // The ground at the bottom of the screen, seen on a sphere: how directly it
+  // faces the camera (1 = head-on, 0 = at the horizon). Turning the planet by
+  // 1 rad moves it r * facing px up the screen.
+  const q = (Math.max(height, 1) - g.cy) / g.r;
+  const facing = Math.sqrt(Math.max(1 - q * q, 1e-4));
+  return {
+    ...g,
+    cy: g.cy - PARALLAX * scroll,
+    spin: (FLOW * scroll) / (g.r * facing),
+  };
 }

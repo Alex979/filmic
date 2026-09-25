@@ -1,9 +1,5 @@
-import { Hero } from "./Hero";
+import { Showcase } from "./Showcase";
 
 export default function App() {
-  return (
-    <main className="stage">
-      <Hero />
-    </main>
-  );
+  return <Showcase />;
 }
