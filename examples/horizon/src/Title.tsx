@@ -10,6 +10,9 @@ import { horizonCircle } from "./horizonGradient";
 import { clamp } from "./math";
 import type { Anchor } from "./play";
 
+/** The title's font size on a wide screen, in CSS px. */
+export const TITLE_FULL_SIZE = 112;
+
 const ease = {
   in: (t: number) => t * t,
   inOut: (t: number) =>
@@ -115,7 +118,7 @@ export function Title({
   // `clamp(66px, 46px + 3.8vw, 112px)`): 112px at 1740px wide and up, easing
   // down to 66px at about 530px, so phones still get a sizable title. Never
   // wider than 84% of the width. Everything else below is a ratio of it.
-  let size = clamp(46 + 0.038 * W, 66, 112);
+  let size = clamp(46 + 0.038 * W, 66, TITLE_FULL_SIZE);
   if (widthPerPx > 0) size = Math.min(size, (0.84 * W) / widthPerPx);
   // The baseline sits 0.24em above the horizon, on a circle around the same
   // center, so the title follows its curve.

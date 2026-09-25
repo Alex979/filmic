@@ -1,6 +1,7 @@
 import GUI from "lil-gui";
 import { createFpsMeter } from "./fpsMeter";
-import { HORIZON_FILM, HORIZON_INK } from "./look";
+import type { Inks } from "./inks";
+import { HORIZON_FILM, HORIZON_INK, SUBTITLE_SOFTNESS } from "./look";
 import {
   DEFAULT_DUST,
   DEFAULT_FOOTAGE,
@@ -12,11 +13,10 @@ import {
   DEFAULT_OPTICS,
   type Film,
   type FrameFit,
-  type InkFilter,
 } from "filmic";
 
 interface TitleControls {
-  ink: InkFilter;
+  inks: Inks;
   text: string;
   setText(text: string): void;
   setPlain(plain: boolean): void;
@@ -163,15 +163,19 @@ export function createControls(film: Film, title: TitleControls): GUI {
 
   // --- Title ---
   const titleState = { text: title.text, on: true };
-  const ink = { ...title.ink.options };
-  const applyInk = () => title.ink.set(ink);
+  const ink = { ...title.inks.options };
+  const applyInk = () => title.inks.set(ink);
   const t = gui.addFolder("Title");
   t.add(titleState, "text").onChange((v: string) => title.setText(v));
   t.add(titleState, "on")
     .name("ink")
     .onChange((on: boolean) => title.setPlain(!on));
   t.add(ink, "roughness", 0, 4, 0.01).name("roughness (px)").onChange(applyInk);
-  t.add(ink, "softness", 0, 3, 0.01).name("softness (px)").onChange(applyInk);
+  // Softness at the title's full size; both scale down with it.
+  t.add(ink, "softness", 0, 3, 0.01).name("title softness (px)").onChange(applyInk);
+  t.add(ink, "subtitleSoftness", 0, 3, 0.01)
+    .name("subtitle softness (px)")
+    .onChange(applyInk);
   t.add(ink, "firmness", 0.5, 3, 0.01).onChange(applyInk);
   t.add(ink, "pinholes", 0, 0.6, 0.005).onChange(applyInk);
   t.add(ink, "seed", 0, 100, 1).onChange(applyInk);
@@ -214,7 +218,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
             anchorY: DEFAULT_FRAME.anchor[1],
             resolution: DEFAULT_FRAME.resolution,
           });
-          Object.assign(optics, DEFAULT_OPTICS);
+          Object.assign(optics, DEFAULT_OPTICS, HORIZON_FILM.optics);
           Object.assign(halation, DEFAULT_HALATION, HORIZON_FILM.halation);
           halationState.on = true;
           Object.assign(mottle, DEFAULT_MOTTLE);
@@ -223,7 +227,9 @@ export function createControls(film: Film, title: TitleControls): GUI {
           grainState.on = true;
           Object.assign(dust, DEFAULT_DUST);
           dustState.on = true;
-          Object.assign(ink, DEFAULT_INK, HORIZON_INK);
+          Object.assign(ink, DEFAULT_INK, HORIZON_INK, {
+            subtitleSoftness: SUBTITLE_SOFTNESS,
+          });
           titleState.on = true;
           title.setPlain(false);
           applyInk();

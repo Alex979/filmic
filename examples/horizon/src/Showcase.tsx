@@ -1,17 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { createFilm, inkFilter, type Film } from "filmic";
+import { createFilm, type Film } from "filmic";
 import { createControls } from "./controls";
 import { createCursor } from "./cursor";
-import { HORIZON_FILM, HORIZON_INK } from "./look";
+import { createInks, type Inks } from "./inks";
+import { HORIZON_FILM } from "./look";
 import { clamp } from "./math";
-import { createPlay } from "./play";
+import { createPlay, type Anchor } from "./play";
 import { createRipples } from "./ripples";
 import { horizonScene } from "./scene";
 import { createSound, type Sound } from "./sound";
-import { Title } from "./Title";
+import { Title, TITLE_FULL_SIZE } from "./Title";
 
 const INK_ID = "horizon-ink";
+const SUBTITLE_INK_ID = "horizon-subtitle-ink";
 const TITLE = "filmic";
 
 // Intro timeline, in seconds. The fade from black is a plain CSS animation
@@ -53,6 +55,9 @@ export function Showcase() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const filmRef = useRef<Film | null>(null);
+  const inksRef = useRef<Inks | null>(null);
+  // The title's font size, which the inks soften for.
+  const sizeRef = useRef(TITLE_FULL_SIZE);
   const [play] = useState(createPlay);
   const [text, setText] = useState(TITLE);
   const [plain, setPlain] = useState(false);
@@ -96,13 +101,16 @@ export function Showcase() {
       ...HORIZON_FILM,
     });
     filmRef.current = film;
-    const ink = inkFilter(HORIZON_INK, INK_ID);
+    const inks = createInks(INK_ID, SUBTITLE_INK_ID);
+    inks.setSize(sizeRef.current);
+    inksRef.current = inks;
+    const boiling = [inks.title, inks.subtitle];
 
     // The title and subheading sit above the canvas, in a layer that moves
     // with the film: its weave, its flicker, and ink that boils every frame.
     // Its CSS animations (the subheading's) step at the footage frame rate.
     const layer = layerRef.current!;
-    let detach = film.attach(layer, { ink });
+    let detach = film.attach(layer, { ink: boiling });
     const unsync = film.sync(layer);
 
     // --- Input: at the screen's rate ---
@@ -130,8 +138,8 @@ export function Showcase() {
     // touch screen, dragging scrolls, so a tap moves the target instead, or
     // a drag that starts on the ring moves it along.
     const root = document.documentElement;
-    const cursor = createCursor(ink, stage);
-    const ripples = createRipples(film, ink, stage);
+    const cursor = createCursor(inks.title, stage);
+    const ripples = createRipples(film, inks.title, stage);
     let mouse = matchMedia("(hover: hover)").matches;
     let inside = !mouse; // the pointer is over the page
     let wasFree = false;
@@ -341,13 +349,13 @@ export function Showcase() {
     });
 
     const controls = createControls(film, {
-      ink,
+      inks,
       text: TITLE,
       setText,
       setPlain,
       setBoil(on) {
         detach();
-        detach = film.attach(layer, on ? { ink } : {});
+        detach = film.attach(layer, on ? { ink: boiling } : {});
       },
       replay() {
         scroller.scrollTo(0, 0);
@@ -384,7 +392,8 @@ export function Showcase() {
       controls.destroy();
       unsync();
       detach();
-      ink.destroy();
+      inks.destroy();
+      inksRef.current = null;
       film.destroy();
       filmRef.current = null;
     };
@@ -417,6 +426,15 @@ export function Showcase() {
     };
   }, [introKey, play]);
 
+  const onAnchor = useCallback(
+    (anchor: Anchor) => {
+      play.setAnchor(anchor);
+      sizeRef.current = anchor.size;
+      inksRef.current?.setSize(anchor.size);
+    },
+    [play],
+  );
+
   const toggleSound = () => {
     const sound = soundRef.current;
     if (!sound) return;
@@ -435,6 +453,8 @@ export function Showcase() {
   // (see inkFilter's `glow`).
   const filter = plain ? undefined : `url(#${INK_ID})`;
   const glow = `var(--${INK_ID}-glow)`;
+  const subtitleFilter = plain ? undefined : `url(#${SUBTITLE_INK_ID})`;
+  const subtitleGlow = `var(--${SUBTITLE_INK_ID}-glow)`;
   return (
     <div ref={stageRef} className="stage">
       <canvas ref={canvasRef} className="film" />
@@ -449,13 +469,13 @@ export function Showcase() {
               glow={glow}
               melt={melt.amount}
               hidden={melt.hidden}
-              onAnchor={play.setAnchor}
+              onAnchor={onAnchor}
             >
               {started && (
-                // Plain HTML text with the same ink. The paragraph glows and
-                // animates in; the span inside it is inked.
-                <p key={introKey} className="subtitle" style={{ filter: glow }}>
-                  <span style={{ filter }}>Beautiful, procedural film effects for web</span>
+                // Plain HTML text in its own ink (see inks.ts). The paragraph
+                // glows and animates in; the span inside it is inked.
+                <p key={introKey} className="subtitle" style={{ filter: subtitleGlow }}>
+                  <span style={{ filter: subtitleFilter }}>Beautiful, procedural film effects for web</span>
                 </p>
               )}
             </Title>
