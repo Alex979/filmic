@@ -35,11 +35,11 @@ export interface HalationOptions {
 }
 
 /**
- * Defaults tuned by eye on sources with no film look of their own: a warm
- * bloom around white text and lights, little change to bright skies.
+ * Defaults tuned by eye on sources with no film look of their own: a subtle
+ * warm bloom around white text and lights, little change to bright skies.
  */
 export const DEFAULT_HALATION: HalationOptions = {
-  amount: 1,
+  amount: 0.4,
   threshold: 0.6,
   radius: 28,
   color: "#ff6230",

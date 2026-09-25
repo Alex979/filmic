@@ -97,7 +97,7 @@ have one.
 
 | Option      | Default     | Description                                                                   |
 | ----------- | ----------- | ----------------------------------------------------------------------------- |
-| `amount`    | `1`         | Strength. `0` turns halation off.                                             |
+| `amount`    | `0.4`       | Strength. `0` turns halation off.                                             |
 | `threshold` | `0.6`       | Brightness (0–1) where highlights start to glow. White glows fully.           |
 | `radius`    | `28`        | How far the glow reaches, in film px.                                         |
 | `color`     | `"#ff6230"` | Color of the glow. Real halation is red-orange.                               |
@@ -275,7 +275,7 @@ from CSS before it exists.
 | `firmness`       | `1.14`      | Opacity boost after the blur, to firm the edges back up.          |
 | `pinholes`       | `0.175`     | Pinholes through the ink: `0` = none, higher = more and larger.   |
 | `seed`           | `0`         | Changes the noise pattern.                                        |
-| `halation`       | `0`         | Halation: a warm glow around light ink. `1` matches the canvas's. |
+| `halation`       | `0`         | Halation: a warm glow around light ink, on the canvas's scale.    |
 | `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
 | `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
 

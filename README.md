@@ -225,7 +225,7 @@ const film = createFilm(canvas, {
   source: elementSource(photo),
   footage: { enabled: true },
 });
-const ink = inkFilter({ halation: 1 }, "title-ink"); // the id the CSS refers to
+const ink = inkFilter({ halation: 0.4 }, "title-ink"); // the id the CSS refers to
 
 const text = document.querySelector<HTMLElement>(".hero-text")!;
 film.attach(text, { ink }); // weave, flicker, boiling ink

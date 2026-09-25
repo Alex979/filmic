@@ -49,8 +49,9 @@ export interface InkOptions {
   /** Changes the noise pattern. Footage mode changes it every frame. */
   seed: number;
   /**
-   * Halation: a warm glow around the ink, for light ink. 0 = none. Applied
-   * with `glow`, on the element around the inked one.
+   * Halation: a warm glow around the ink, for light ink. 0 = none. On the
+   * same scale as the canvas halation's `amount` (default 0.4). Applied with
+   * `glow`, on the element around the inked one.
    */
   halation: number;
   /** How far the glow reaches, in CSS px. */
