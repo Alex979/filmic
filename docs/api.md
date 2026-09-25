@@ -305,12 +305,15 @@ emptiable editable elements from collapsing (e.g. with padding).
 ### film.attach
 
 ```ts
-film.attach(element: HTMLElement | SVGElement, options?: { ink?: InkFilter }): () => void
+film.attach(
+  element: HTMLElement | SVGElement,
+  options?: { ink?: InkFilter | InkFilter[] },
+): () => void
 ```
 
 While footage plays, each frame it sets the element's `transform` (the weave,
 about the film frame's center), `filter` (the flicker, as `brightness()`),
-and, with `ink`, advances the ink's noise. It takes over `transform`,
+and, with `ink` (one filter or several), advances the ink's noise. It takes over `transform`,
 `transform-origin` and `filter`, so attach a wrapper, not the styled element
 itself. The returned function detaches it and clears those styles.
 
