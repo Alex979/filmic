@@ -34,8 +34,7 @@ export interface FootageOptions {
 }
 
 /**
- * Defaults tuned by eye against a reference hero, at a 1080 film px frame
- * (its 0.7 px weave at a ~830 px tall screen is 0.9 film px).
+ * Defaults tuned by eye, at a 1080 film px frame.
  */
 export const DEFAULT_FOOTAGE: FootageOptions = {
   enabled: false,

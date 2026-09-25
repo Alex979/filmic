@@ -18,10 +18,10 @@ import { hexToLinear, shaderSource, type Hex } from "filmic";
 export type HorizonRow = [height: number, colors: [Hex, Hex, Hex, Hex, Hex]];
 
 /**
- * Sampled from the reference sunset: 24 heights, placed where the colors
- * change fastest, by 5 points along the horizon. Blended linearly in linear
- * light, it's within ~2 levels of the reference on average; what's left is
- * cloud-like texture along the horizon, which a smooth table can't hold.
+ * 24 heights, placed where the colors change fastest, by 5 points along the
+ * horizon, blended linearly in linear light. It holds the broad shape of the
+ * sunset; cloud-like texture along the horizon would need more than a smooth
+ * table.
  */
 export const HORIZON_TABLE: HorizonRow[] = [
   // the planet: near-black, warming toward the rim

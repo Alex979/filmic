@@ -45,10 +45,10 @@ export interface GrainOptions {
 }
 
 /**
- * Defaults tuned by measuring rendered output against a scanned-film reference
- * at the same viewport: visible grain strength per brightness band, correlation
- * with the next pixel and the one after (grain size and crispness), and R/G
- * correlation (color) all match within a few percent.
+ * Defaults calibrated against scanned film, measured on screen: visible grain
+ * strength per brightness band, correlation with the next pixel and the one
+ * after (grain size and crispness), and R/G correlation (color) all match
+ * within a few percent.
  */
 export const DEFAULT_GRAIN: GrainOptions = {
   amount: 1,

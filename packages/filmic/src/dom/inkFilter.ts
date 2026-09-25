@@ -32,7 +32,7 @@ export interface InkOptions {
   seed: number;
 }
 
-/** Defaults matching a hand-tuned reference title. */
+/** Defaults: a subtle printed look for display-size text. */
 export const DEFAULT_INK: InkOptions = {
   roughness: 0.6,
   softness: 0.7,

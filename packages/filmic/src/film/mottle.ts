@@ -40,9 +40,9 @@ export interface MottleOptions {
 }
 
 /**
- * Defaults measured from a scanned-film reference: blotch spectrum, streak
- * share and direction, strength per brightness band and R/G/B correlation, at
- * a 1080 film px frame.
+ * Defaults measured from scanned film: blotch spectrum, streak share and
+ * direction, strength per brightness band and R/G/B correlation, at a 1080
+ * film px frame.
  */
 export const DEFAULT_MOTTLE: MottleOptions = {
   amount: 0.33,
@@ -132,7 +132,7 @@ export const mottleTexelSize = (size: number) => size / TEXEL_SIGMA;
  *
  * Three layers are read from the same texture, each from a different spot so
  * they don't line up: blotches at `size`, blotches at twice the size (weighted
- * 1.5x, matching the reference's spectrum), and streaks (the texture stretched
+ * 1.5x, matching scanned film's spectrum), and streaks (the texture stretched
  * 0.75x across, 30x down).
  */
 export const MOTTLE_GLSL = /* glsl */ `
