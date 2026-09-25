@@ -34,6 +34,14 @@ body {
   height: 100%;
 }
 
+/* Around the title's SVG, for its halation glow (Safari ignores CSS filter
+   functions on SVG elements). */
+.title-glow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 /* The title overlay: same box as the canvas, SVG units = CSS px. */
 .overlay {
   position: absolute;
@@ -108,19 +116,20 @@ body {
 }
 
 .film-layer .subtitle {
-  position: relative; /* for the rise, see subtitle-in */
-  top: 0; /* not auto, which can't be animated */
   pointer-events: auto; /* selectable */
   /* Stepped at the footage frame rate by film.sync(). */
   animation: subtitle-in 1.2s cubic-bezier(0.33, 1, 0.68, 1) 1.35s both;
 }
 
-/* Fades with color and rises with top, not opacity and transform: Safari
-   gives elements animating those their own layer, which the layer's
-   halation glow (a filter on .film-layer) doesn't reach until it ends. */
 @keyframes subtitle-in {
   from {
-    color: transparent;
-    top: 0.5em;
+    opacity: 0;
+    transform: translateY(0.5em);
   }
+}
+
+/* The inked text inside the subtitle. A box of its own, so the ink filter
+   applies to it as a whole. */
+.subtitle > span {
+  display: inline-block;
 }

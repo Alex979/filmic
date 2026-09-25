@@ -279,14 +279,19 @@ from CSS before it exists.
 | `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
 | `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
 
-The halation glow goes on an element that *contains* the inked ones, not on
-them: `film.attach(wrapper, { ink })` does this for you. Without `attach`, set
-`filter: var(--id-glow)` on a wrapper yourself (`ink.glow` is that value; the
-custom property lives on the page's root element and follows `set()`). The
-glow is CSS `drop-shadow()` layers, which Safari ignores on SVG elements and
-clips when they follow an SVG filter, hence the wrapper. In Safari, a child
-that animates `opacity` or `transform` misses the glow until the animation
-ends; animate `color` and `top` instead.
+The halation glow goes on the element *around* the inked one, not on it:
+
+```html
+<p style="filter: var(--title-ink-glow)">
+  <span style="display: inline-block; filter: url(#title-ink)">Evening</span>
+</p>
+```
+
+`ink.glow` is that `var(--id-glow)` value; the custom property lives on the
+page's root element and follows `set()`. The glow is CSS `drop-shadow()`
+layers, and Safari clips them when they share an element with the SVG filter,
+and ignores them on SVG elements, so SVG text takes its glow from an HTML
+parent. The glowing element can animate `opacity` and `transform` freely.
 
 The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and
@@ -299,15 +304,14 @@ emptiable editable elements from collapsing (e.g. with padding).
 ### film.attach
 
 ```ts
-film.attach(element: HTMLElement | SVGElement, options?: { ink?: InkFilter; boil?: boolean }): () => void
+film.attach(element: HTMLElement | SVGElement, options?: { ink?: InkFilter }): () => void
 ```
 
 While footage plays, each frame it sets the element's `transform` (the weave,
 about the film frame's center), `filter` (the flicker, as `brightness()`),
-and, with `ink`, advances the ink's noise (unless `boil: false`). With `ink`,
-the element's `filter` also carries the ink's halation glow, still or
-playing. It takes over `transform`, `transform-origin` and `filter`, so attach
-a wrapper, not the styled element itself. The returned function detaches it and clears those styles.
+and, with `ink`, advances the ink's noise. It takes over `transform`,
+`transform-origin` and `filter`, so attach a wrapper, not the styled element
+itself. The returned function detaches it and clears those styles.
 
 ### film.sync
 

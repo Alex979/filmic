@@ -27,20 +27,14 @@ export type FrameListener = (frame: FrameEvent) => void;
 type Subscribe = (listener: FrameListener) => () => void;
 
 export interface AttachOptions {
-  /**
-   * An ink filter used inside the element: its noise boils every frame, and
-   * its halation glow is applied to the element.
-   */
+  /** An ink filter used inside the element: its noise boils every frame. */
   ink?: InkFilter;
-  /** Boil the ink's noise every footage frame. Default true. */
-  boil?: boolean;
 }
 
 /**
  * Move an element with the film: each frame's weave (as a transform about
  * the film frame's center) and flicker (as a brightness filter), and boil an
- * ink filter's noise. The ink's halation glow goes on the element, around
- * everything inside it, and flickers with it. It takes over the element's `transform`,
+ * ink filter's noise. It takes over the element's `transform`,
  * `transform-origin` and `filter`, so attach a wrapper around the content
  * (which can have its own transforms and filters).
  *
@@ -57,13 +51,11 @@ export function attachElement(
   options: AttachOptions = {},
 ) {
   const style = element.style;
-  const { ink, boil = true } = options;
-  const glow = ink ? `${ink.glow} ` : "";
-  const reset = (still = true) => {
+  const { ink } = options;
+  const reset = () => {
     style.transform = "";
     style.transformOrigin = "";
-    // A still keeps the glow; detaching removes it too.
-    style.filter = still ? glow.trim() : "";
+    style.filter = "";
     ink?.setFrame(0);
   };
 
@@ -76,13 +68,13 @@ export function attachElement(
     const oy = c.top + f.origin[1] - e.top;
     style.transformOrigin = `${ox.toFixed(2)}px ${oy.toFixed(2)}px`;
     style.transform = `translate(${f.dx.toFixed(3)}px, ${f.dy.toFixed(3)}px) rotate(${f.rotation.toFixed(6)}rad)`;
-    style.filter = `${glow}brightness(${f.brightness.toFixed(4)})`;
-    if (boil) ink?.setFrame(f.n);
+    style.filter = `brightness(${f.brightness.toFixed(4)})`;
+    ink?.setFrame(f.n);
   });
 
   return () => {
     off();
-    reset(false);
+    reset();
   };
 }
 

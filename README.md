@@ -172,9 +172,10 @@ gives them the same look:
 - **`inkFilter()`** is an SVG filter for a printed-on-film look: slightly
   rough, soft edges and tiny pinholes. It works on any element, and selection
   highlights and the text cursor get it too. With `halation`, light ink also
-  gets film's warm glow, to match the canvas's (applied by `film.attach`).
+  gets film's warm glow, to match the canvas's: `ink.glow` goes on the
+  element around the inked one.
 - **`film.attach(element)`** moves an element with the film each frame (weave
-  and flicker), makes its ink boil and adds the ink's halation glow. It takes over the element's `transform`
+  and flicker) and makes its ink boil. It takes over the element's `transform`
   and `filter`, so attach a wrapper around your content.
 - **`film.sync(element)`** steps the element's CSS animations and transitions
   at the footage frame rate, in lockstep with the film. Anything you don't sync
@@ -184,8 +185,8 @@ gives them the same look:
 <section class="hero">
   <canvas class="hero-film"></canvas>
   <div class="hero-text">
-    <h1>Evening</h1>
-    <p class="tagline">A short film</p>
+    <h1><span>Evening</span></h1>
+    <p class="tagline"><span>A short film</span></p>
   </div>
 </section>
 ```
@@ -197,19 +198,22 @@ gives them the same look:
   display: grid;
   place-content: center;
 }
+/* The glow goes around the inked text, not on it (Safari clips it there). */
 .hero-text h1,
 .hero-text .tagline {
+  filter: var(--title-ink-glow);
+}
+.hero-text span {
+  display: inline-block;
   filter: url(#title-ink);
 }
 .tagline {
-  position: relative;
-  top: 0;
   animation: fade-up 1.2s 0.6s both;
 }
 @keyframes fade-up {
   from {
-    color: transparent; /* not opacity or transform: see "Good to know" */
-    top: 0.5em;
+    opacity: 0;
+    transform: translateY(0.5em);
   }
 }
 ```
@@ -224,7 +228,7 @@ const film = createFilm(canvas, {
 const ink = inkFilter({ halation: 1 }, "title-ink"); // the id the CSS refers to
 
 const text = document.querySelector<HTMLElement>(".hero-text")!;
-film.attach(text, { ink }); // weave, flicker, boiling ink, halation
+film.attach(text, { ink }); // weave, flicker, boiling ink
 film.sync(text); // the tagline's fade-up steps at 12 fps
 ```
 
@@ -304,10 +308,6 @@ Every option and default is listed in [docs/api.md](docs/api.md).
   curve (e.g. SVG `textPath`) can jitter by a pixel as the ink boils, because
   browsers snap upright glyphs to whole pixels. An invisible
   `transform: skewX(0.05deg)` on the text fixes it.
-- **Animating glowing text in Safari:** Safari gives elements that animate
-  `opacity` or `transform` their own layer, which the halation glow on the
-  attached wrapper doesn't reach until the animation ends, so the glow pops in.
-  Fade with `color` and move with `top` or `margin` instead.
 - **Editable inked text:** browsers skip SVG filters on zero-size elements, so
   give an emptiable editable element some padding, or its cursor shows
   unfiltered.

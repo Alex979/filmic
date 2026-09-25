@@ -15,11 +15,13 @@ import { hexToRgb, type Hex } from "../core/color";
  *   4. a second noise field, thresholded, punches pinholes through the ink
  *
  * Halation, the warm glow film gives bright highlights, is separate: CSS
- * drop-shadow() glows (`ink.glow`) for an element that contains the ink,
- * usually the one passed to `film.attach()`, which applies them itself. On
- * the inked elements themselves they'd fail in Safari, which ignores CSS
- * filter functions on SVG elements and clips them to the SVG filter's region
- * when they follow a url() filter.
+ * drop-shadow() glows (`ink.glow`) for the element *around* the inked one,
+ * e.g. `<p style="filter: var(--id-glow)"><span style="filter: url(#id)">`.
+ * Safari needs the two apart: it clips drop-shadow() to the SVG filter's
+ * region when both are on one element, and ignores it on SVG elements (so
+ * SVG text gets its glow from an HTML parent). The glowing element can
+ * animate opacity and transform freely; a glow on an ancestor of an
+ * animating element wouldn't reach it in Safari while it animates.
  *
  * Sizes are in CSS px, because the browser applies the filter in the
  * element's own coordinates.
@@ -41,7 +43,7 @@ export interface InkOptions {
   seed: number;
   /**
    * Halation: a warm glow around the ink, for light ink. 0 = none. Applied
-   * to a containing element, see `glow`.
+   * with `glow`, on the element around the inked one.
    */
   halation: number;
   /** How far the glow reaches, in CSS px. */
@@ -71,10 +73,10 @@ export interface InkFilter {
    */
   readonly url: string;
   /**
-   * The ink's halation glow as a CSS filter value, `var(--id-glow)`, for an
-   * element that contains the inked elements (not the inked elements
-   * themselves). `film.attach(wrapper, { ink })` applies it for you. The
-   * custom property is set on the page's root element and follows `set()`.
+   * The ink's halation glow as a CSS filter value, `var(--id-glow)`. Put it
+   * on the element directly around the inked one, not on the inked element
+   * itself (see above). The custom property is set on the page's root element
+   * and follows `set()`, so stylesheets can use `var(--id-glow)` too.
    */
   readonly glow: string;
   /** Current options. */
@@ -186,8 +188,8 @@ export function inkFilter(
     };
     return [shadow(0.21, 0.45, 0.1), shadow(0.71, 0.5), shadow(2, 0.45)].join(" ");
   };
-  // With no glow the property still holds a filter that does nothing, so
-  // `filter: var(--id-glow) brightness(...)` stays valid.
+  // With no glow the property still holds a filter that does nothing, so a
+  // filter list that includes var(--id-glow) stays valid.
   const property = `--${id}-glow`;
   const publish = () =>
     document.documentElement.style.setProperty(

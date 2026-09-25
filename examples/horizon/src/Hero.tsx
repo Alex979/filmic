@@ -38,8 +38,7 @@ export function Hero() {
     const ink = inkFilter(HORIZON_INK, INK_ID);
 
     // The title and subheading sit above the canvas, in a layer that moves
-    // with the film: its weave, its flicker, ink that boils every frame, and
-    // the ink's halation glow around everything in it.
+    // with the film: its weave, its flicker, and ink that boils every frame.
     // Its CSS animations (the subheading's) step at the footage frame rate.
     const layer = layerRef.current!;
     let detach = film.attach(layer, { ink });
@@ -52,7 +51,7 @@ export function Hero() {
       setPlain,
       setBoil(on) {
         detach();
-        detach = film.attach(layer, { ink, boil: on });
+        detach = film.attach(layer, on ? { ink } : {});
       },
       replay: () => setIntroKey((k) => k + 1),
     });
@@ -91,18 +90,21 @@ export function Hero() {
     };
   }, [introKey]);
 
-  // The ink alone: its glow is on the layer (see film.attach).
+  // The ink goes on the text, and its halation glow on the element around it
+  // (see inkFilter's `glow`).
   const filter = plain ? undefined : `url(#${INK_ID})`;
+  const glow = `var(--${INK_ID}-glow)`;
   return (
     <>
       <canvas ref={canvasRef} className="film" />
       <div key={introKey} className={started ? "fade play" : "fade"} />
       <div ref={layerRef} className="film-layer">
-        <Title text={text} rise={rise} filter={filter}>
+        <Title text={text} rise={rise} filter={filter} glow={glow}>
           {started && (
-            // Plain HTML text with the same ink, via CSS.
-            <p key={introKey} className="subtitle" style={{ filter }}>
-              A procedural film look for the web
+            // Plain HTML text with the same ink. The paragraph glows and
+            // animates in; the span inside it is inked.
+            <p key={introKey} className="subtitle" style={{ filter: glow }}>
+              <span style={{ filter }}>A procedural film look for the web</span>
             </p>
           )}
         </Title>

@@ -31,6 +31,11 @@ interface TitleProps {
   rise: number;
   /** CSS filter to print the title with (an ink filter's `url`), if any. */
   filter?: string;
+  /**
+   * CSS filter for the title's halation (an ink filter's `glow`), if any. It
+   * goes on an HTML wrapper: Safari ignores it on SVG elements.
+   */
+  glow?: string;
   /** Shown centered just below the horizon's apex (the subheading). */
   children?: ReactNode;
 }
@@ -44,7 +49,7 @@ interface TitleProps {
  * whatever is below the rim, the text slides up through it, and a soft edge
  * sweeps across from left to right to reveal it.
  */
-export function Title({ text, rise, filter, children }: TitleProps) {
+export function Title({ text, rise, filter, glow, children }: TitleProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const textRef = useRef<SVGTextElement>(null);
   const sweepRef = useRef<SVGLinearGradientElement>(null);
@@ -135,69 +140,71 @@ export function Title({ text, rise, filter, children }: TitleProps) {
 
   return (
     <>
-      <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
-        <defs>
-          <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
+      <div className="title-glow" style={{ filter: glow }}>
+        <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
+          <defs>
+            <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
 
-          <radialGradient
-            id={`${uid}-sky`}
-            gradientUnits="userSpaceOnUse"
-            cx={circle.cx}
-            cy={circle.cy}
-            r={maskR}
-          >
-            {stops.map(([t, a]) => (
-              <stop
-                key={t}
-                offset={((lo + (hi - lo) * t) / maskR).toFixed(6)}
-                stopColor="#fff"
-                stopOpacity={a}
-              />
-            ))}
-          </radialGradient>
-          <mask id={`${uid}-sky-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
-            <rect {...fullRect} fill={`url(#${uid}-sky)`} />
-          </mask>
+            <radialGradient
+              id={`${uid}-sky`}
+              gradientUnits="userSpaceOnUse"
+              cx={circle.cx}
+              cy={circle.cy}
+              r={maskR}
+            >
+              {stops.map(([t, a]) => (
+                <stop
+                  key={t}
+                  offset={((lo + (hi - lo) * t) / maskR).toFixed(6)}
+                  stopColor="#fff"
+                  stopOpacity={a}
+                />
+              ))}
+            </radialGradient>
+            <mask id={`${uid}-sky-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+              <rect {...fullRect} fill={`url(#${uid}-sky)`} />
+            </mask>
 
-          <linearGradient
-            id={`${uid}-sweep`}
-            ref={sweepRef}
-            gradientUnits="userSpaceOnUse"
-            y1={0}
-            y2={0}
-          >
-            <stop offset="0" stopColor="#fff" />
-            <stop offset="0" stopColor="#fff" />
-            <stop offset="0" stopColor="#000" />
-            <stop offset="1" stopColor="#000" />
-          </linearGradient>
-          <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
-            <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
-          </mask>
-        </defs>
+            <linearGradient
+              id={`${uid}-sweep`}
+              ref={sweepRef}
+              gradientUnits="userSpaceOnUse"
+              y1={0}
+              y2={0}
+            >
+              <stop offset="0" stopColor="#fff" />
+              <stop offset="0" stopColor="#fff" />
+              <stop offset="0" stopColor="#000" />
+              <stop offset="1" stopColor="#000" />
+            </linearGradient>
+            <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+              <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
+            </mask>
+          </defs>
 
-        {W > 0 && (
-          <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
-            <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
-              <text
-                ref={textRef}
-                className="title"
-                role="heading"
-                aria-level={1}
-                fontSize={size.toFixed(1)}
-                textAnchor="middle"
-                opacity={o > 0.001 ? 1 : 0}
-                style={{ filter }}
-                mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
-              >
-                <textPath href={`#${uid}-arc`} startOffset="50%">
-                  <tspan dy={dy.toFixed(2)}>{text}</tspan>
-                </textPath>
-              </text>
+          {W > 0 && (
+            <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
+              <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
+                <text
+                  ref={textRef}
+                  className="title"
+                  role="heading"
+                  aria-level={1}
+                  fontSize={size.toFixed(1)}
+                  textAnchor="middle"
+                  opacity={o > 0.001 ? 1 : 0}
+                  style={{ filter }}
+                  mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
+                >
+                  <textPath href={`#${uid}-arc`} startOffset="50%">
+                    <tspan dy={dy.toFixed(2)}>{text}</tspan>
+                  </textPath>
+                </text>
+              </g>
             </g>
-          </g>
-        )}
-      </svg>
+          )}
+        </svg>
+      </div>
       {W > 0 && (
         <div
           className="below-horizon"
