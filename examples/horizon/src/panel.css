@@ -41,6 +41,23 @@
   box-shadow: 0 14px 44px rgb(0 0 0 / 0.38);
 }
 
+/* Collapsed (once it has finished closing): a small pill, just its title,
+   fainter, so it stays out of the way until it's wanted. */
+.lil-gui.lil-root.lil-closed:not(.lil-transition) {
+  width: auto;
+  border-radius: 999px;
+  background: rgb(22 18 16 / 0.42);
+  border-color: rgb(255 240 220 / 0.07);
+  box-shadow: none;
+}
+
+.lil-gui.lil-root.lil-closed:not(.lil-transition) > .lil-title {
+  height: 28px;
+  padding: 0 12px 0 10px;
+  font-size: 10px;
+  color: rgb(242 237 228 / 0.72);
+}
+
 /* Titles: the panel's, then each section's, as quiet small caps */
 .lil-gui .lil-title {
   display: flex;
