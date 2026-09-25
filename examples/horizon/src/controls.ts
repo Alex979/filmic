@@ -33,7 +33,10 @@ export function createControls(film: Film, title: TitleControls): GUI {
     folder.controllersRecursive().forEach((c) => c.updateDisplay());
 
   // --- Frame rate readout, for measuring on devices without dev tools ---
-  const meter = createFpsMeter();
+  // Shown in the panel's title bar, so it's visible open or closed.
+  const meter = createFpsMeter((text) =>
+    gui.title(text ? `filmic · ${text}` : "filmic"),
+  );
   gui
     .add({ fps: false }, "fps")
     .name("show fps")

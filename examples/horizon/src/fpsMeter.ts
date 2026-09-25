@@ -1,49 +1,45 @@
 /**
- * A small frame-rate readout, for measuring what the film costs on a device
- * without developer tools (e.g. a phone). It counts animation frames over the
- * last second, and shows the longest single frame in it: stutter comes from
- * one heavy frame at a time, which an average hides.
+ * A frame-rate readout, for measuring what the film costs on a device without
+ * developer tools (e.g. a phone). It counts animation frames over the last
+ * second, and reports the longest single frame in it: stutter comes from one
+ * heavy frame at a time, which an average hides.
  */
 export interface FpsMeter {
   show(on: boolean): void;
   destroy(): void;
 }
 
-export function createFpsMeter(): FpsMeter {
-  const el = document.createElement("div");
-  el.className = "fps-meter";
-  el.hidden = true;
-  document.body.append(el);
-
+/** `report` gets the readout a few times a second, and null when hidden. */
+export function createFpsMeter(report: (text: string | null) => void): FpsMeter {
   const times: number[] = [];
   let raf = 0;
-  let lastText = 0;
+  let lastReport = 0;
 
   const tick = (now: number) => {
     times.push(now);
     while (times.length && now - times[0] > 1000) times.shift();
-    if (now - lastText > 250 && times.length > 1) {
-      lastText = now;
+    if (now - lastReport > 250 && times.length > 1) {
+      lastReport = now;
       let worst = 0;
       for (let i = 1; i < times.length; i++)
         worst = Math.max(worst, times[i] - times[i - 1]);
       const fps = ((times.length - 1) * 1000) / (now - times[0]);
-      el.textContent = `${fps.toFixed(0)} fps · worst ${worst.toFixed(0)} ms`;
+      report(`${fps.toFixed(0)} fps · worst ${worst.toFixed(0)} ms`);
     }
     raf = requestAnimationFrame(tick);
   };
 
+  const stop = () => {
+    cancelAnimationFrame(raf);
+    times.length = 0;
+  };
+
   return {
     show(on) {
-      el.hidden = !on;
-      cancelAnimationFrame(raf);
-      times.length = 0;
-      el.textContent = "…";
+      stop();
+      report(on ? "…" : null);
       if (on) raf = requestAnimationFrame(tick);
     },
-    destroy() {
-      cancelAnimationFrame(raf);
-      el.remove();
-    },
+    destroy: stop,
   };
 }
