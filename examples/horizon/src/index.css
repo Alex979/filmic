@@ -33,3 +33,44 @@ body {
   width: 100%;
   height: 100%;
 }
+
+/* The title overlay: same box as the canvas, SVG units = CSS px. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* HTML subheading just below the horizon's apex (53% down the stage). */
+.subtitle {
+  position: absolute;
+  top: calc(53% + clamp(22px, 3.4vw, 48px));
+  left: 50%;
+  translate: -50% 0;
+  width: max-content;
+  max-width: 84%;
+  margin: 0;
+  /* Never zero-width, even when emptied: the ink filter would be skipped and
+     the text cursor would show unfiltered. */
+  padding-inline: 0.5em;
+  font-family: var(--serif);
+  font-size: clamp(19px, 2.1vw, 30px);
+  font-style: italic;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: var(--light);
+  opacity: 0.82;
+  outline: none;
+}
+
+.overlay .title {
+  font-family: var(--serif);
+  font-kerning: normal;
+  font-weight: 465;
+  letter-spacing: -0.012em;
+  fill: var(--light);
+  pointer-events: auto; /* selectable */
+}

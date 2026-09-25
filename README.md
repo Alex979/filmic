@@ -39,8 +39,10 @@ bun lint
 - [x] Playground example: every kind of source in resizable cards
 - [x] Mottle: faint blotches and streaks of density and color
 - [x] Dust: procedural specks, fibers, hairs and thin lines
-- [ ] Title: curved text (SVG overlay, or drawn into the source)
-- [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust
+- [x] Ink: `inkFilter()` gives DOM text and elements a printed look; curved title in the horizon example
+- [ ] Footage mode: frame clock, weave, flicker, per-frame grain/dust; `film.on("frame")`, `sync()` and `attach()` for DOM elements
 - [ ] Controls panel
-- [ ] Horizon source: cloud-like variation in the sky
+- [ ] Horizon source: the reference's curvature and placement, cloud-like variation in the sky
+- [ ] Page overlay: real grain and dust over DOM content
+- [ ] Filmed text (opt-in): draw DOM text into the film itself
 - [ ] Look (optional): tone curve, halation, vignette

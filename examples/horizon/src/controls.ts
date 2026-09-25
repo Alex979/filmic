@@ -3,14 +3,23 @@ import {
   DEFAULT_DUST,
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
+  DEFAULT_INK,
   DEFAULT_MOTTLE,
   DEFAULT_OPTICS,
   type Film,
   type FrameFit,
+  type InkFilter,
 } from "filmic";
 
+interface TitleControls {
+  ink: InkFilter;
+  text: string;
+  setText(text: string): void;
+  setPlain(plain: boolean): void;
+}
+
 /** A tuning panel for a film. Returns the panel so the caller can destroy it. */
-export function createControls(film: Film): GUI {
+export function createControls(film: Film, title: TitleControls): GUI {
   const gui = new GUI({ title: "filmic" });
   const refresh = (folder: GUI) =>
     folder.controllersRecursive().forEach((c) => c.updateDisplay());
@@ -110,6 +119,21 @@ export function createControls(film: Film): GUI {
   d.add(dust, "hairs", 0, 0.5, 0.001).name("hair share").onChange(applyDust);
   d.add(dust, "seed", 0, 100, 1).onChange(applyDust);
 
+
+  // --- Title ---
+  const titleState = { text: title.text, on: true };
+  const ink = { ...title.ink.options };
+  const applyInk = () => title.ink.set(ink);
+  const t = gui.addFolder("Title");
+  t.add(titleState, "text").onChange((v: string) => title.setText(v));
+  t.add(titleState, "on")
+    .name("ink")
+    .onChange((on: boolean) => title.setPlain(!on));
+  t.add(ink, "roughness", 0, 4, 0.01).name("roughness (px)").onChange(applyInk);
+  t.add(ink, "softness", 0, 3, 0.01).name("softness (px)").onChange(applyInk);
+  t.add(ink, "firmness", 0.5, 3, 0.01).onChange(applyInk);
+  t.add(ink, "pinholes", 0, 0.6, 0.005).onChange(applyInk);
+  t.add(ink, "seed", 0, 100, 1).onChange(applyInk);
   gui
     .add(
       {
@@ -128,6 +152,10 @@ export function createControls(film: Film): GUI {
           grainState.on = true;
           Object.assign(dust, DEFAULT_DUST);
           dustState.on = true;
+          Object.assign(ink, DEFAULT_INK);
+          titleState.on = true;
+          title.setPlain(false);
+          applyInk();
           refresh(gui);
           applyFrame();
           applyOptics();

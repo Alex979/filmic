@@ -46,3 +46,6 @@ export type {
   FilmableElement,
 } from "./sources/elementSource";
 export { testPattern } from "./sources/testPattern";
+
+export { inkFilter, DEFAULT_INK } from "./dom/inkFilter";
+export type { InkFilter, InkOptions } from "./dom/inkFilter";

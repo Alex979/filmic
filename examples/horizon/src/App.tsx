@@ -1,9 +1,9 @@
-import { FilmCanvas } from "./FilmCanvas";
+import { Hero } from "./Hero";
 
 export default function App() {
   return (
     <main className="stage">
-      <FilmCanvas />
+      <Hero />
     </main>
   );
 }
