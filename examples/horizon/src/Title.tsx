@@ -1,4 +1,11 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { horizonCircle } from "./horizonGradient";
 
 const clamp = (x: number, lo: number, hi: number) =>
@@ -24,6 +31,8 @@ interface TitleProps {
   rise: number;
   /** CSS filter to print the title with (an ink filter's url), if any. */
   filter?: string;
+  /** Shown centered just below the horizon's apex (the subheading). */
+  children?: ReactNode;
 }
 
 /**
@@ -35,7 +44,7 @@ interface TitleProps {
  * whatever is below the rim, the text slides up through it, and a soft edge
  * sweeps across from left to right to reveal it.
  */
-export function Title({ text, rise, filter }: TitleProps) {
+export function Title({ text, rise, filter, children }: TitleProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const textRef = useRef<SVGTextElement>(null);
   const sweepRef = useRef<SVGLinearGradientElement>(null);
@@ -73,12 +82,19 @@ export function Title({ text, rise, filter }: TitleProps) {
   const { W, H } = view;
   const circle = horizonCircle(W, H);
 
-  // About 6.6% of the width, within limits, and never wider than 84% of it.
-  let size = clamp(0.066 * W, 34, 112);
+  // One size for the whole block, growing gently with the width (like CSS
+  // `clamp(66px, 46px + 3.8vw, 112px)`): 112px at 1740px wide and up, easing
+  // down to 66px at about 530px, so phones still get a sizable title. Never
+  // wider than 84% of the width. Everything else below is a ratio of it.
+  let size = clamp(46 + 0.038 * W, 66, 112);
   if (widthPerPx > 0) size = Math.min(size, (0.84 * W) / widthPerPx);
   // The baseline sits 0.24em above the horizon, on a circle around the same
   // center, so the title follows its curve.
-  const arcR = circle.r + 0.24 * size + (W <= 760 ? 16 : 0);
+  const arcR = circle.r + 0.24 * size;
+  // The subheading: about a third of the title's size, half a title height
+  // below the apex.
+  const belowY = circle.cy - circle.r + 0.52 * size;
+  const belowSize = 0.32 * size;
 
   // --- Rise ---
   const o = clamp(rise, 0, 1);
@@ -118,68 +134,81 @@ export function Title({ text, rise, filter }: TitleProps) {
   const fullRect = { x: -big, y: -big, width: 2 * big, height: 2 * big };
 
   return (
-    <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
-      <defs>
-        <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
+    <>
+      <svg ref={svgRef} className="overlay" viewBox={`0 0 ${W || 1} ${H || 1}`}>
+        <defs>
+          <path id={`${uid}-arc`} d={arcPath(circle.cx, circle.cy, arcR)} fill="none" />
 
-        <radialGradient
-          id={`${uid}-sky`}
-          gradientUnits="userSpaceOnUse"
-          cx={circle.cx}
-          cy={circle.cy}
-          r={maskR}
-        >
-          {stops.map(([t, a]) => (
-            <stop
-              key={t}
-              offset={((lo + (hi - lo) * t) / maskR).toFixed(6)}
-              stopColor="#fff"
-              stopOpacity={a}
-            />
-          ))}
-        </radialGradient>
-        <mask id={`${uid}-sky-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
-          <rect {...fullRect} fill={`url(#${uid}-sky)`} />
-        </mask>
+          <radialGradient
+            id={`${uid}-sky`}
+            gradientUnits="userSpaceOnUse"
+            cx={circle.cx}
+            cy={circle.cy}
+            r={maskR}
+          >
+            {stops.map(([t, a]) => (
+              <stop
+                key={t}
+                offset={((lo + (hi - lo) * t) / maskR).toFixed(6)}
+                stopColor="#fff"
+                stopOpacity={a}
+              />
+            ))}
+          </radialGradient>
+          <mask id={`${uid}-sky-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+            <rect {...fullRect} fill={`url(#${uid}-sky)`} />
+          </mask>
 
-        <linearGradient
-          id={`${uid}-sweep`}
-          ref={sweepRef}
-          gradientUnits="userSpaceOnUse"
-          y1={0}
-          y2={0}
-        >
-          <stop offset="0" stopColor="#fff" />
-          <stop offset="0" stopColor="#fff" />
-          <stop offset="0" stopColor="#000" />
-          <stop offset="1" stopColor="#000" />
-        </linearGradient>
-        <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
-          <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
-        </mask>
-      </defs>
+          <linearGradient
+            id={`${uid}-sweep`}
+            ref={sweepRef}
+            gradientUnits="userSpaceOnUse"
+            y1={0}
+            y2={0}
+          >
+            <stop offset="0" stopColor="#fff" />
+            <stop offset="0" stopColor="#fff" />
+            <stop offset="0" stopColor="#000" />
+            <stop offset="1" stopColor="#000" />
+          </linearGradient>
+          <mask id={`${uid}-sweep-mask`} maskUnits="userSpaceOnUse" {...fullRect}>
+            <rect {...fullRect} fill={`url(#${uid}-sweep)`} />
+          </mask>
+        </defs>
 
-      {W > 0 && (
-        <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
-          <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
-            <text
-              ref={textRef}
-              className="title"
-              role="heading"
-              aria-level={1}
-              fontSize={size.toFixed(1)}
-              textAnchor="middle"
-              opacity={o > 0.001 ? 1 : 0}
-              filter={filter}
-              mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
-            >
-              <textPath href={`#${uid}-arc`} startOffset="50%">
-                <tspan dy={dy.toFixed(2)}>{text}</tspan>
-              </textPath>
-            </text>
+        {W > 0 && (
+          <g mask={o < 1 ? `url(#${uid}-sky-mask)` : undefined}>
+            <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
+              <text
+                ref={textRef}
+                className="title"
+                role="heading"
+                aria-level={1}
+                fontSize={size.toFixed(1)}
+                textAnchor="middle"
+                opacity={o > 0.001 ? 1 : 0}
+                filter={filter}
+                mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
+              >
+                <textPath href={`#${uid}-arc`} startOffset="50%">
+                  <tspan dy={dy.toFixed(2)}>{text}</tspan>
+                </textPath>
+              </text>
+            </g>
           </g>
-        </g>
+        )}
+      </svg>
+      {W > 0 && (
+        <div
+          className="below-horizon"
+          style={{
+            top: `${belowY.toFixed(1)}px`,
+            fontSize: `${belowSize.toFixed(1)}px`,
+          }}
+        >
+          {children}
+        </div>
       )}
-    </svg>
+    </>
   );
 }

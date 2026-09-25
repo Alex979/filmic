@@ -5,6 +5,7 @@ import { createControls } from "./controls";
 import { Title } from "./Title";
 
 const INK_ID = "horizon-ink";
+const TITLE = "filmic";
 
 // Intro timeline, in seconds. The fade from black is a plain CSS animation
 // (see .fade in index.css), so it runs at the screen's refresh rate. The
@@ -20,7 +21,7 @@ export function Hero() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const filmRef = useRef<Film | null>(null);
-  const [text, setText] = useState("Horizon");
+  const [text, setText] = useState(TITLE);
   const [plain, setPlain] = useState(false);
   const [started, setStarted] = useState(false);
   const [introKey, setIntroKey] = useState(0);
@@ -43,7 +44,7 @@ export function Hero() {
 
     const controls = createControls(film, {
       ink,
-      text: "Horizon",
+      text: TITLE,
       setText,
       setPlain,
       setBoil(on) {
@@ -93,21 +94,14 @@ export function Hero() {
       <canvas ref={canvasRef} className="film" />
       <div key={introKey} className={started ? "fade play" : "fade"} />
       <div ref={layerRef} className="film-layer">
-        <Title text={text} rise={rise} filter={filter} />
-        {started && (
-          // Plain HTML text with the same ink, via CSS. Editable, to try the
-          // cursor and selection under the filter.
-          <p
-            key={introKey}
-            className="subtitle"
-            style={{ filter }}
-            contentEditable="plaintext-only"
-            suppressContentEditableWarning
-            spellCheck={false}
-          >
-            A procedural film look for the web
-          </p>
-        )}
+        <Title text={text} rise={rise} filter={filter}>
+          {started && (
+            // Plain HTML text with the same ink, via CSS.
+            <p key={introKey} className="subtitle" style={{ filter }}>
+              A procedural film look for the web
+            </p>
+          )}
+        </Title>
       </div>
     </>
   );

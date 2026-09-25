@@ -80,14 +80,14 @@ export interface HorizonGeometry {
 
 /**
  * The horizon for a `width` x `height` canvas. Its apex sits 53% of the way
- * down (a little higher on phones), and the scene is drawn just big enough to
+ * down, and the scene is drawn just big enough to
  * cover the canvas, with a small margin, around it. On narrow screens the
  * radius is capped so the curve stays visible.
  */
 export function horizonGeometry(width: number, height: number): HorizonGeometry {
   const W = Math.max(width, 1);
   const H = Math.max(height, 1);
-  const apex = 0.53 - (W <= 760 ? 24 / H : 0);
+  const apex = 0.53;
   const margin = Math.max(18, 0.021 * Math.max(W, H));
   const scale = Math.max(
     (apex * H + margin) / APEX_IN_FRAME, // room above the horizon
