@@ -2,6 +2,7 @@ import GUI from "lil-gui";
 import {
   DEFAULT_FRAME,
   DEFAULT_GRAIN,
+  DEFAULT_MOTTLE,
   DEFAULT_OPTICS,
   type FrameFit,
 } from "filmic";
@@ -34,6 +35,25 @@ export function createControls(): GUI {
     .name("blur (film px)")
     .onChange(applyOptics);
 
+  // --- Mottle ---
+  const mottle = { ...DEFAULT_MOTTLE };
+  const mottleState = { on: true };
+  const applyMottle = () =>
+    setAll({
+      mottle: { ...mottle, amount: mottleState.on ? mottle.amount : 0 },
+    });
+  const m = gui.addFolder("Mottle");
+  m.add(mottleState, "on").name("enabled").onChange(applyMottle);
+  m.add(mottle, "amount", 0, 8, 0.01)
+    .name("amount (levels)")
+    .onChange(applyMottle);
+  m.add(mottle, "size", 1, 40, 0.1)
+    .name("size (film px)")
+    .onChange(applyMottle);
+  m.add(mottle, "streaks", 0, 2, 0.01).onChange(applyMottle);
+  m.add(mottle, "chroma", 0, 1, 0.01).name("color").onChange(applyMottle);
+  m.add(mottle, "seed", 0, 100, 1).onChange(applyMottle);
+
   // --- Grain ---
   const grain = { ...DEFAULT_GRAIN };
   const grainState = { on: true };
@@ -64,11 +84,14 @@ export function createControls(): GUI {
             resolution: DEFAULT_FRAME.resolution,
           });
           Object.assign(optics, DEFAULT_OPTICS);
+          Object.assign(mottle, DEFAULT_MOTTLE);
+          mottleState.on = true;
           Object.assign(grain, DEFAULT_GRAIN);
           grainState.on = true;
           gui.controllersRecursive().forEach((c) => c.updateDisplay());
           applyFrame();
           applyOptics();
+          applyMottle();
           applyGrain();
         },
       },

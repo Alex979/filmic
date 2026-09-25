@@ -1,4 +1,4 @@
-import { createProgram, FULLSCREEN_VERT } from "../core/gl";
+import { createGeneratedTexture, NOISE_GLSL } from "../core/noise";
 
 /**
  * Film grain.
@@ -85,26 +85,7 @@ uniform int uSize;
 
 out vec4 fragColor;
 
-// PCG-style integer hash: good-quality randomness with no visible patterns.
-uvec3 pcg3d(uvec3 v) {
-  v = v * 1664525u + 1013904223u;
-  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-  v ^= v >> 16u;
-  v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
-  return v;
-}
-
-vec3 rand3(ivec2 p, uint stream) {
-  // Wrap coordinates so the texture tiles seamlessly.
-  p = (p % uSize + uSize) % uSize;
-  return vec3(pcg3d(uvec3(p, uSeed * 8u + stream))) / 4294967296.;
-}
-
-// Two independent standard normals from two uniforms (Box-Muller).
-vec2 normals(vec2 u) {
-  float r = sqrt(-2. * log(max(u.x, 1e-7)));
-  return r * vec2(cos(6.2831853 * u.y), sin(6.2831853 * u.y));
-}
+${NOISE_GLSL}
 
 // 1D kernel weight at offset d (0, 1 or 2 texels): a gaussian for softness,
 // minus a little at distance 2 for sharpness.
@@ -126,8 +107,8 @@ void main() {
       float w = kernel(abs(i)) * kernel(abs(j));
       if (abs(w) < 1e-5) continue;
       ivec2 q = p + ivec2(i, j);
-      vec3 a = rand3(q, 0u);
-      vec3 b = rand3(q, 1u);
+      vec3 a = rand3(q, uSize, uSeed, 0u);
+      vec3 b = rand3(q, uSize, uSeed, 1u);
       vec4 n = vec4(normals(a.xy), normals(vec2(a.z, b.x)));
       // Grains vary in how strongly they show; E[k^2] for k in [.4, 1.6] is 1.12.
       float k = mix(.4, 1.6, b.y) / 1.0583;
@@ -148,61 +129,23 @@ export interface GrainTexture {
 }
 
 export function createGrainTexture(gl: WebGL2RenderingContext): GrainTexture {
-  const N = GRAIN_TEXTURE_SIZE;
-  const { program, uniforms: u } = createProgram(
-    gl,
-    FULLSCREEN_VERT,
-    GRAIN_GEN_FRAG,
-  );
-
-  const texture = gl.createTexture()!;
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texStorage2D(gl.TEXTURE_2D, Math.log2(N) + 1, gl.RGBA8, N, N);
-  // Mipmaps: where grain is finer than a screen pixel, the GPU averages it
-  // down instead of aliasing (the same thing a display would do physically).
-  gl.texParameteri(
-    gl.TEXTURE_2D,
-    gl.TEXTURE_MIN_FILTER,
-    gl.LINEAR_MIPMAP_LINEAR,
-  );
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-
-  const framebuffer = gl.createFramebuffer()!;
-  gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-  gl.framebufferTexture2D(
-    gl.FRAMEBUFFER,
-    gl.COLOR_ATTACHMENT0,
-    gl.TEXTURE_2D,
-    texture,
-    0,
-  );
-
+  const generated = createGeneratedTexture(gl, GRAIN_GEN_FRAG, GRAIN_TEXTURE_SIZE);
   let current = "";
 
   return {
-    texture,
+    texture: generated.texture,
     update(seed, softness, sharpness) {
       const key = `${seed}|${softness}|${sharpness}`;
       if (key === current) return;
       current = key;
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.viewport(0, 0, N, N);
-      gl.useProgram(program);
-      gl.uniform1ui(u.uSeed, Math.max(0, Math.floor(seed)) >>> 0);
-      gl.uniform1f(u.uSoftness, softness);
-      gl.uniform1f(u.uSharpness, sharpness);
-      gl.uniform1i(u.uSize, N);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      gl.generateMipmap(gl.TEXTURE_2D);
+      generated.generate((u) => {
+        gl.uniform1ui(u.uSeed, Math.max(0, Math.floor(seed)) >>> 0);
+        gl.uniform1f(u.uSoftness, softness);
+        gl.uniform1f(u.uSharpness, sharpness);
+        gl.uniform1i(u.uSize, GRAIN_TEXTURE_SIZE);
+      });
     },
-    dispose() {
-      gl.deleteFramebuffer(framebuffer);
-      gl.deleteTexture(texture);
-      gl.deleteProgram(program);
-    },
+    dispose: generated.dispose,
   };
 }
 
@@ -240,10 +183,16 @@ vec2 grainBreakup(vec2 filmPx) {
   return grainTexel(filmPx, vec2(517.3, 293.9)).xy * .5 * uGrainBreakup;
 }
 
-float grainLevel(float L) {
+// A strength for brightness L, through three control points: shadows at 0,
+// midtones at GRAIN_PIVOT, highlights at 1. Mottle uses the same shape.
+float toneLevel(vec3 levels, float L) {
   return L < GRAIN_PIVOT
-    ? mix(uGrainLevels.x, uGrainLevels.y, smoothstep(0., GRAIN_PIVOT, L))
-    : mix(uGrainLevels.y, uGrainLevels.z, smoothstep(GRAIN_PIVOT, 1., L));
+    ? mix(levels.x, levels.y, smoothstep(0., GRAIN_PIVOT, L))
+    : mix(levels.y, levels.z, smoothstep(GRAIN_PIVOT, 1., L));
+}
+
+float grainLevel(float L) {
+  return toneLevel(uGrainLevels, L);
 }
 
 // Add grain to an sRGB color.

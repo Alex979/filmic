@@ -1,6 +1,7 @@
 import { createFilmPass, type FilmSettings } from "./film/filmPass";
 import { DEFAULT_FRAME, type FrameOptions } from "./film/frame";
 import { DEFAULT_GRAIN, type GrainOptions } from "./film/grain";
+import { DEFAULT_MOTTLE, type MottleOptions } from "./film/mottle";
 import { DEFAULT_OPTICS, type OpticsOptions } from "./film/optics";
 import type { Source, SourceContext, SourceInstance, View } from "./source";
 import { testPattern } from "./sources/testPattern";
@@ -16,6 +17,8 @@ export interface FilmUpdate {
   frame?: Partial<FrameOptions>;
   /** Lens and emulsion softness. */
   optics?: Partial<OpticsOptions>;
+  /** Faint, soft blotches of density and color. */
+  mottle?: Partial<MottleOptions>;
   grain?: Partial<GrainOptions>;
 }
 
@@ -62,6 +65,7 @@ export function createFilm(
   const settings: FilmSettings = {
     frame: { ...DEFAULT_FRAME, ...options.frame },
     optics: { ...DEFAULT_OPTICS, ...options.optics },
+    mottle: { ...DEFAULT_MOTTLE, ...options.mottle },
     grain: { ...DEFAULT_GRAIN, ...options.grain },
   };
 
@@ -144,6 +148,8 @@ export function createFilm(
       if (update.frame) settings.frame = { ...settings.frame, ...update.frame };
       if (update.optics)
         settings.optics = { ...settings.optics, ...update.optics };
+      if (update.mottle)
+        settings.mottle = { ...settings.mottle, ...update.mottle };
       if (update.grain) settings.grain = { ...settings.grain, ...update.grain };
       render();
     },
@@ -156,6 +162,7 @@ export function createFilm(
           anchor: [settings.frame.anchor[0], settings.frame.anchor[1]],
         },
         optics: { ...settings.optics },
+        mottle: { ...settings.mottle },
         grain: { ...settings.grain },
       };
     },

@@ -19,6 +19,7 @@ export function setAll(update: Omit<FilmUpdate, "source">) {
   shared = {
     frame: { ...shared.frame, ...update.frame },
     optics: { ...shared.optics, ...update.optics },
+    mottle: { ...shared.mottle, ...update.mottle },
     grain: { ...shared.grain, ...update.grain },
   };
   films.forEach((film) => film.set(update));
