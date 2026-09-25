@@ -1,4 +1,5 @@
 import GUI from "lil-gui";
+import { createFpsMeter } from "./fpsMeter";
 import { HORIZON_FILM, HORIZON_INK } from "./look";
 import {
   DEFAULT_DUST,
@@ -30,6 +31,18 @@ export function createControls(film: Film, title: TitleControls): GUI {
   const gui = new GUI({ title: "filmic" });
   const refresh = (folder: GUI) =>
     folder.controllersRecursive().forEach((c) => c.updateDisplay());
+
+  // --- Frame rate readout, for measuring on devices without dev tools ---
+  const meter = createFpsMeter();
+  gui
+    .add({ fps: false }, "fps")
+    .name("show fps")
+    .onChange((on: boolean) => meter.show(on));
+  const destroy = gui.destroy.bind(gui);
+  gui.destroy = () => {
+    meter.destroy();
+    destroy();
+  };
 
   // --- Frame ---
   const s = film.settings;
