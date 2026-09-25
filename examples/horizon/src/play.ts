@@ -37,6 +37,8 @@ export interface Play {
   ): void;
   /** The blob, for the scene's shader. */
   readonly shape: BlobShape;
+  /** How fast the blob is going, in its own head radii per second. */
+  readonly speed: number;
   /** How melted the title is: 0 = text, 1 = a drop. */
   readonly melt: number;
   /** The blob has the title's ink (the text itself is hidden). */
@@ -217,6 +219,9 @@ export function createPlay(): Play {
     },
     get shape() {
       return blob.shape;
+    },
+    get speed() {
+      return blob.speed / Math.max(blob.shape.radius, 1);
     },
     get melt() {
       return melt;

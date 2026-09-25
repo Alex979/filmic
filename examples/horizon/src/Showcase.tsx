@@ -6,6 +6,7 @@ import { createCursor } from "./cursor";
 import { HORIZON_FILM, HORIZON_INK } from "./look";
 import { createPlay } from "./play";
 import { horizonScene } from "./scene";
+import { createSound, type Sound } from "./sound";
 import { Title } from "./Title";
 
 const INK_ID = "horizon-ink";
@@ -23,6 +24,11 @@ const BLOB_FPS = 24;
 // On a touch screen, a touch this near the target ring (px from its center)
 // picks it up to drag, instead of scrolling the page.
 const RING_REACH = 48;
+// Remembers whether sound was on, for the next visit.
+const SOUND_KEY = "filmic-horizon-sound";
+// Controls that aren't part of the scene: pressing them doesn't chime or
+// move the target.
+const UI = ".lil-gui, .sound";
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));
@@ -55,6 +61,8 @@ export function Showcase() {
   const [introKey, setIntroKey] = useState(0);
   const [rise, setRise] = useState(0);
   const [melt, setMelt] = useState({ amount: 0, boil: 0, hidden: false });
+  const soundRef = useRef<Sound | null>(null);
+  const [soundOn, setSoundOn] = useState(false);
 
   useEffect(() => {
     const stage = stageRef.current!;
@@ -157,16 +165,23 @@ export function Showcase() {
       showCursor();
     };
     let tap: { id: number; x: number; y: number; t: number } | null = null;
+    // A click or tap on the scene chimes, pitched and panned by where.
+    const chime = (e: PointerEvent) => {
+      const { x, y } = onStage(e);
+      sound.chime(x / stage.clientWidth, y / stage.clientHeight);
+    };
     const onDown = (e: PointerEvent) => {
+      const el = e.target as Element;
       if (e.pointerType !== "touch") {
         // Most of the page can't be selected (see .page), so the browser
         // leaves a selection alone when you click it. Clear it by hand.
-        const el = e.target as Element;
-        if (e.button === 0 && !el.closest?.(".title, .subtitle, .lil-gui"))
+        if (e.button === 0 && !el.closest?.(`.title, .subtitle, ${UI}`)) {
           getSelection()?.removeAllRanges();
+          chime(e);
+        }
         return cursor.press(true);
       }
-      if ((e.target as Element).closest?.(".lil-gui")) return;
+      if (el.closest?.(UI)) return;
       if (play.free && !drag) {
         const { x, y } = onStage(e);
         const ring = play.target;
@@ -197,7 +212,9 @@ export function Showcase() {
         e.timeStamp - tap.t < 400 &&
         Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 12;
       tap = null;
-      if (!quick || !play.free) return;
+      if (!quick) return;
+      chime(e);
+      if (!play.free) return;
       const { x, y } = onStage(e);
       play.pointTo(x, y);
       cursor.moveTo(x, y, true);
@@ -215,6 +232,33 @@ export function Showcase() {
     root.addEventListener("pointerleave", onLeave);
     stage.addEventListener("touchstart", onTouchStart, { passive: false });
 
+    // --- Sound ---
+    // Off until asked for (browsers only start audio from a click or tap).
+    // If it was on last time, the first press anywhere turns it back on.
+    const sound = createSound();
+    soundRef.current = sound;
+    const resume = (e: Event) => {
+      if ((e.target as Element).closest?.(".sound")) return; // (it toggles itself)
+      removeEventListener("pointerdown", resume);
+      removeEventListener("keydown", resume);
+      if (sound.on) return;
+      sound.enable();
+      setSoundOn(true);
+    };
+    try {
+      if (localStorage.getItem(SOUND_KEY) === "on") {
+        addEventListener("pointerdown", resume);
+        addEventListener("keydown", resume);
+      }
+    } catch {
+      // (Storage can be blocked; then it just starts off.)
+    }
+    const onVisibility = () => sound.pause(document.hidden);
+    document.addEventListener("visibilitychange", onVisibility);
+    let wasMelt = 0;
+    let wasLoose = false;
+    let wasHappy = false;
+
     // --- Animation: with the film ---
     // The scene steps the blob and the melt as it draws; the title follows
     // here, in the same animation frame, so the ink changes hands cleanly.
@@ -227,6 +271,25 @@ export function Showcase() {
         );
       }
       showCursor();
+
+      // What's heard follows what's drawn.
+      const range = scroller.scrollHeight - scroller.clientHeight;
+      sound.scroll(range > 0 ? scroller.scrollTop / range : 0);
+      // The planet's chord while the blob is out; the title's once it heads
+      // home, so it arrives in its own.
+      sound.chord(play.free ? 1 : 0);
+      if (play.melt > 0 && wasMelt === 0) sound.melt();
+      if (play.loose && !wasLoose) sound.launch();
+      if (!play.loose && wasLoose) sound.home();
+      const happy = play.loose && play.shape.happy > 0.6;
+      if (happy && !wasHappy) sound.happy();
+      wasMelt = play.melt;
+      wasLoose = play.loose;
+      wasHappy = happy;
+      sound.motion(
+        play.shape.nodes[0] / Math.max(stage.clientWidth, 1),
+        play.loose ? play.speed / 25 : 0,
+      );
       // Without footage nothing else redraws, so keep going while it moves.
       if (!f.playing && play.moving) film.render();
     });
@@ -272,6 +335,11 @@ export function Showcase() {
       stage.removeEventListener("touchstart", onTouchStart);
       root.classList.remove("no-cursor");
       offFrame();
+      removeEventListener("pointerdown", resume);
+      removeEventListener("keydown", resume);
+      document.removeEventListener("visibilitychange", onVisibility);
+      sound.destroy();
+      soundRef.current = null;
       cancelAnimationFrame(raf);
       cursor.destroy();
       controls.destroy();
@@ -310,6 +378,19 @@ export function Showcase() {
     };
   }, [introKey, play]);
 
+  const toggleSound = () => {
+    const sound = soundRef.current;
+    if (!sound) return;
+    if (sound.on) sound.disable();
+    else sound.enable();
+    setSoundOn(sound.on);
+    try {
+      localStorage.setItem(SOUND_KEY, sound.on ? "on" : "off");
+    } catch {
+      // (Not remembered, then.)
+    }
+  };
+
   // The ink goes on the text, and its halation glow on the element around it
   // (see inkFilter's `glow`).
   const filter = plain ? undefined : `url(#${INK_ID})`;
@@ -344,6 +425,19 @@ export function Showcase() {
         {/* Where the blob plays. It lives on the screen, over the scene. */}
         <section className="play-area" />
       </main>
+      <button
+        type="button"
+        className={soundOn ? "sound on" : "sound"}
+        aria-pressed={soundOn}
+        onClick={toggleSound}
+      >
+        <span className="sound-bars" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        Sound
+      </button>
     </div>
   );
 }
