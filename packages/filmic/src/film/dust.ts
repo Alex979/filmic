@@ -243,18 +243,28 @@ export function layoutFootageDust(
     const count = poisson(rng, Math.max(0, rate));
     for (let i = 0; i < count; i++) {
       const life = rng.next() < linger ? 2 + Math.floor(rng.next() * 5) : 1;
-      // Wander: a random step of up to ~1.3 film px for each frame alive.
+      // Always generate the piece, with the same random draws whatever its
+      // age, so it's the same piece in every frame it lives through.
+      scratch.length = 0;
+      dustPiece(rng, options, emitInto(scratch));
+      if (age >= life) continue;
+
+      // Wander: a random step of up to ~1.3 film px for each frame alive,
+      // from the piece's own generator so it doesn't disturb the others.
+      const walk = random(Math.floor(hashFrame(born, i, seed + 7) * 4294967296));
       let sx = 0;
       let sy = 0;
       for (let k = 1; k <= age; k++) {
-        sx += (rng.next() - 0.5) * 2.6;
-        sy += (rng.next() - 0.5) * 2.6;
+        sx += (walk.next() - 0.5) * 2.6;
+        sy += (walk.next() - 0.5) * 2.6;
       }
-      // Always generate (so the random sequence doesn't depend on n), keep
-      // only what's still alive.
-      scratch.length = 0;
-      dustPiece(rng, options, emitInto(scratch, sx, sy));
-      if (age < life) out.push(...scratch);
+      for (let j = 0; j < scratch.length; j += FLOATS_PER_PIECE) {
+        scratch[j + 2] += sx;
+        scratch[j + 3] += sy;
+        scratch[j + 4] += sx;
+        scratch[j + 5] += sy;
+      }
+      out.push(...scratch);
     }
   }
   return new Float32Array(out);
