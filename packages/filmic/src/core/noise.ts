@@ -68,6 +68,7 @@ export function createGeneratedTexture(
     texture,
     generate(setUniforms) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.invalidateFramebuffer(gl.FRAMEBUFFER, [gl.COLOR_ATTACHMENT0]);
       gl.viewport(0, 0, size, size);
       gl.useProgram(program);
       setUniforms(uniforms);

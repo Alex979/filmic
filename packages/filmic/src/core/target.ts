@@ -9,7 +9,11 @@ export interface RenderTarget {
   readonly height: number;
   /** Reallocate to a new size (no-op if unchanged). Contents are lost. */
   resize(width: number, height: number): void;
-  /** Bind the framebuffer and set the viewport to cover it. */
+  /**
+   * Bind the framebuffer and set the viewport to cover it, for a pass that
+   * writes every pixel. The old contents are discarded first: tile-based GPUs
+   * (phones, Apple's) would otherwise read them back in before drawing.
+   */
   bind(): void;
   dispose(): void;
 }
@@ -48,6 +52,7 @@ export function createRenderTarget(
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
   const framebuffer = gl.createFramebuffer()!;
+  const attachments = [gl.COLOR_ATTACHMENT0];
   let width = 0;
   let height = 0;
 
@@ -87,6 +92,7 @@ export function createRenderTarget(
     },
     bind() {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+      gl.invalidateFramebuffer(gl.FRAMEBUFFER, attachments);
       gl.viewport(0, 0, width, height);
     },
     dispose() {
