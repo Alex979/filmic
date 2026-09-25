@@ -14,11 +14,12 @@ import { hexToRgb, type Hex } from "../core/color";
  *   3. alpha is boosted to firm the softened edge back up
  *   4. a second noise field, thresholded, punches pinholes through the ink
  *
- * Halation, the warm glow film gives bright highlights, is added after the
- * filter as CSS drop-shadow() glows: unlike the SVG filter, CSS filter
- * functions grow the painted area as far as they need, so the glow is never
- * cut off at the edge of the element. It's part of `ink.filter`, not
- * `ink.url`.
+ * Halation, the warm glow film gives bright highlights, is separate: CSS
+ * drop-shadow() glows (`ink.glow`) for an element that contains the ink,
+ * usually the one passed to `film.attach()`, which applies them itself. On
+ * the inked elements themselves they'd fail in Safari, which ignores CSS
+ * filter functions on SVG elements and clips them to the SVG filter's region
+ * when they follow a url() filter.
  *
  * Sizes are in CSS px, because the browser applies the filter in the
  * element's own coordinates.
@@ -38,7 +39,10 @@ export interface InkOptions {
   pinholes: number;
   /** Changes the noise pattern. Footage mode changes it every frame. */
   seed: number;
-  /** Halation: a warm glow around the ink, for light ink. 0 = none. */
+  /**
+   * Halation: a warm glow around the ink, for light ink. 0 = none. Applied
+   * to a containing element, see `glow`.
+   */
   halation: number;
   /** How far the glow reaches, in CSS px. */
   halationRadius: number;
@@ -67,11 +71,12 @@ export interface InkFilter {
    */
   readonly url: string;
   /**
-   * The full CSS filter value: the ink plus its halation glow, as
-   * `var(--id)`. The custom property is set on the page's root element and
-   * follows `set()`, so in a stylesheet `filter: var(--title-ink)` works too.
+   * The ink's halation glow as a CSS filter value, `var(--id-glow)`, for an
+   * element that contains the inked elements (not the inked elements
+   * themselves). `film.attach(wrapper, { ink })` applies it for you. The
+   * custom property is set on the page's root element and follows `set()`.
    */
-  readonly filter: string;
+  readonly glow: string;
   /** Current options. */
   readonly options: Readonly<InkOptions>;
   /** Change options; elements using the filter update right away. */
@@ -177,15 +182,17 @@ export function inkFilter(
       const [r, g, b] = rgb.map((v) => Math.round((v + (1 - v) * light) * 255));
       const a = Math.min(1, alpha * o.halation).toFixed(3);
       // CSS blur lengths are two standard deviations.
-      return ` drop-shadow(0 0 ${(blur * o.halationRadius).toFixed(2)}px rgb(${r} ${g} ${b} / ${a}))`;
+      return `drop-shadow(0 0 ${(blur * o.halationRadius).toFixed(2)}px rgb(${r} ${g} ${b} / ${a}))`;
     };
-    return shadow(0.21, 0.45, 0.1) + shadow(0.71, 0.5) + shadow(2, 0.45);
+    return [shadow(0.21, 0.45, 0.1), shadow(0.71, 0.5), shadow(2, 0.45)].join(" ");
   };
-  const property = `--${id}`;
+  // With no glow the property still holds a filter that does nothing, so
+  // `filter: var(--id-glow) brightness(...)` stays valid.
+  const property = `--${id}-glow`;
   const publish = () =>
     document.documentElement.style.setProperty(
       property,
-      `url(#${id})${glow(current)}`,
+      glow(current) || "opacity(1)",
     );
 
   apply();
@@ -195,7 +202,7 @@ export function inkFilter(
   return {
     id,
     url: `url(#${id})`,
-    filter: `var(${property})`,
+    glow: `var(${property})`,
     get options() {
       return { ...current };
     },

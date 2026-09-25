@@ -38,7 +38,8 @@ export function Hero() {
     const ink = inkFilter(HORIZON_INK, INK_ID);
 
     // The title and subheading sit above the canvas, in a layer that moves
-    // with the film: its weave, its flicker, and ink that boils every frame.
+    // with the film: its weave, its flicker, ink that boils every frame, and
+    // the ink's halation glow around everything in it.
     // Its CSS animations (the subheading's) step at the footage frame rate.
     const layer = layerRef.current!;
     let detach = film.attach(layer, { ink });
@@ -51,7 +52,7 @@ export function Hero() {
       setPlain,
       setBoil(on) {
         detach();
-        detach = film.attach(layer, on ? { ink } : {});
+        detach = film.attach(layer, { ink, boil: on });
       },
       replay: () => setIntroKey((k) => k + 1),
     });
@@ -90,8 +91,8 @@ export function Hero() {
     };
   }, [introKey]);
 
-  // The ink and its halation glow (see inkFilter's `filter`).
-  const filter = plain ? undefined : `var(--${INK_ID})`;
+  // The ink alone: its glow is on the layer (see film.attach).
+  const filter = plain ? undefined : `url(#${INK_ID})`;
   return (
     <>
       <canvas ref={canvasRef} className="film" />

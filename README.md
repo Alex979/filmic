@@ -172,9 +172,9 @@ gives them the same look:
 - **`inkFilter()`** is an SVG filter for a printed-on-film look: slightly
   rough, soft edges and tiny pinholes. It works on any element, and selection
   highlights and the text cursor get it too. With `halation`, light ink also
-  gets film's warm glow, to match the canvas's.
+  gets film's warm glow, to match the canvas's (applied by `film.attach`).
 - **`film.attach(element)`** moves an element with the film each frame (weave
-  and flicker) and makes its ink boil. It takes over the element's `transform`
+  and flicker), makes its ink boil and adds the ink's halation glow. It takes over the element's `transform`
   and `filter`, so attach a wrapper around your content.
 - **`film.sync(element)`** steps the element's CSS animations and transitions
   at the footage frame rate, in lockstep with the film. Anything you don't sync
@@ -199,7 +199,7 @@ gives them the same look:
 }
 .hero-text h1,
 .hero-text .tagline {
-  filter: var(--title-ink); /* the ink, plus its halation glow */
+  filter: url(#title-ink);
 }
 .tagline {
   animation: fade-up 1.2s 0.6s both;
@@ -222,7 +222,7 @@ const film = createFilm(canvas, {
 const ink = inkFilter({ halation: 1 }, "title-ink"); // the id the CSS refers to
 
 const text = document.querySelector<HTMLElement>(".hero-text")!;
-film.attach(text, { ink }); // weave, flicker, boiling ink
+film.attach(text, { ink }); // weave, flicker, boiling ink, halation
 film.sync(text); // the tagline's fade-up steps at 12 fps
 ```
 

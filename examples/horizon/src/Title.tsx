@@ -29,7 +29,7 @@ interface TitleProps {
   text: string;
   /** 0 = hidden below the horizon, 1 = fully risen. */
   rise: number;
-  /** CSS filter to print the title with (an ink filter's `filter`), if any. */
+  /** CSS filter to print the title with (an ink filter's `url`), if any. */
   filter?: string;
   /** Shown centered just below the horizon's apex (the subheading). */
   children?: ReactNode;

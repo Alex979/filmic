@@ -75,9 +75,10 @@ export interface Film {
    */
   frameTime(now?: number): number;
   /**
-   * Move an element with the film each frame (weave and flicker) and boil an
-   * ink filter's noise. Takes over the element's transform and filter, so use
-   * a wrapper. Returns a function that detaches it.
+   * Move an element with the film each frame (weave and flicker), boil an
+   * ink filter's noise and apply its halation glow. Takes over the element's
+   * transform and filter, so use a wrapper. Returns a function that detaches
+   * it.
    */
   attach(element: HTMLElement | SVGElement, options?: AttachOptions): () => void;
   /**

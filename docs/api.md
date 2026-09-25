@@ -263,10 +263,9 @@ uploaded image, whose first row is its top, uses `[1, -1]` and `[0, 1]`.
 inkFilter(options?: Partial<InkOptions>, id?: string): InkFilter
 ```
 
-Adds an SVG filter to the page for a printed-on-film look. Apply it with CSS:
-`filter: var(--id)` in a stylesheet, or `element.style.filter = ink.filter`.
-That's the ink plus its halation glow; `ink.url` (`url(#id)`) is the ink
-alone. Any number of elements can share one. Pass an `id` to reference it
+Adds an SVG filter to the page for a printed-on-film look. Apply it with CSS
+(`filter: url(#id)`, or `element.style.filter = ink.url`) or an SVG `filter`
+attribute. Any number of elements can share one. Pass an `id` to reference it
 from CSS before it exists.
 
 | Option           | Default     | Description                                                       |
@@ -280,11 +279,14 @@ from CSS before it exists.
 | `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
 | `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
 
-The glow is made of CSS `drop-shadow()` layers after the SVG filter, so it's
-never cut off at the element's edges. `ink.filter` is `var(--id)`: the custom
-property is set on the page's root element and updates with `set()`.
+The halation glow goes on an element that *contains* the inked ones, not on
+them: `film.attach(wrapper, { ink })` does this for you. Without `attach`, set
+`filter: var(--id-glow)` on a wrapper yourself (`ink.glow` is that value; the
+custom property lives on the page's root element and follows `set()`). The
+glow is CSS `drop-shadow()` layers, which Safari ignores on SVG elements and
+clips when they follow an SVG filter, hence the wrapper.
 
-The returned `InkFilter` has `id`, `url`, `filter`, `options`, `set(options)`,
+The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and
 `destroy()`.
 
@@ -295,14 +297,15 @@ emptiable editable elements from collapsing (e.g. with padding).
 ### film.attach
 
 ```ts
-film.attach(element: HTMLElement | SVGElement, options?: { ink?: InkFilter }): () => void
+film.attach(element: HTMLElement | SVGElement, options?: { ink?: InkFilter; boil?: boolean }): () => void
 ```
 
 While footage plays, each frame it sets the element's `transform` (the weave,
 about the film frame's center), `filter` (the flicker, as `brightness()`),
-and, with `ink`, advances the ink's noise. It takes over `transform`,
-`transform-origin` and `filter`, so attach a wrapper, not the styled element
-itself. The returned function detaches it and clears those styles.
+and, with `ink`, advances the ink's noise (unless `boil: false`). With `ink`,
+the element's `filter` also carries the ink's halation glow, still or
+playing. It takes over `transform`, `transform-origin` and `filter`, so attach
+a wrapper, not the styled element itself. The returned function detaches it and clears those styles.
 
 ### film.sync
 
