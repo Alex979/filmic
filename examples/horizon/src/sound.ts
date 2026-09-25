@@ -10,6 +10,8 @@
  *     when it's having fun, and a little run up the scale when it's home
  *   - a glassy chime for each click or tap, higher up the screen, higher up
  *     the chord, and panned to where it was
+ *   - a harp run up and down the chord as a selection's edge sweeps across
+ *     the subtitle
  *
  * Every note played is one of the current chord's.
  *
@@ -34,6 +36,12 @@ export interface Sound {
   launch(): void;
   home(): void;
   happy(): void;
+  /**
+   * Where a selection's moving edge is along a line of text (0..1), or null
+   * once there's no selection: each step along plays the chord's next note.
+   * A new selection runs up to it from `from`, where it began.
+   */
+  trace(p: number | null, from?: number): void;
   destroy(): void;
 }
 
@@ -51,6 +59,9 @@ const CHORDS = [
 ];
 /** Chimes span this many octaves up from the chord's lowest tone. */
 const OCTAVES = 3;
+/** A selection's run: this many of the chord's notes across a line, from an
+ * octave up. */
+const TRACE_NOTES = 11;
 /** How quickly the chords cross over (time constant, s: done in about 3x). */
 const CROSS_IN = 0.8;
 const CROSS_OUT = 0.55;
@@ -64,6 +75,7 @@ export function createSound(): Sound {
   let ctx: AudioContext | null = null;
   let on = false;
   let lastHappy = -Infinity;
+  let traced = -1; // the last note a selection's edge played
   let suspendTimer = 0;
   // Filled in by build().
   let master: GainNode;
@@ -359,6 +371,27 @@ export function createSound(): Sound {
       [tone(0, 1), tone(2, 1), tone(3, 1), tone(0, 2)].forEach((f, i) =>
         bell(f, 0.06, i * 0.09),
       );
+    },
+    trace(p, start = p ?? 0) {
+      if (p === null) {
+        traced = -1;
+        return;
+      }
+      const note = (q: number) =>
+        Math.round(Math.min(Math.max(q, 0), 1) * (TRACE_NOTES - 1));
+      const i = note(p);
+      if (i === traced) return;
+      // On from where it last was (or where a new selection began),
+      // strumming through any notes it jumped past, a few at most.
+      const from = traced < 0 ? note(start) : traced + Math.sign(i - traced);
+      const step = Math.sign(i - from) || 1;
+      const count = Math.min(Math.abs(i - from) + 1, 8);
+      const scale = notes().slice(CHORDS[current].tones.length); // an octave up
+      for (let k = 0; k < count; k++) {
+        const n = i - step * (count - 1 - k);
+        bell(midi(scale[n]), 0.045, k * 0.028, ((n / (TRACE_NOTES - 1)) * 2 - 1) * 0.6, 1.4);
+      }
+      traced = i;
     },
     happy() {
       if (!ctx || ctx.currentTime - lastHappy < 2.5) return;

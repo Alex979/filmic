@@ -259,6 +259,27 @@ export function Showcase() {
     }
     const onVisibility = () => sound.pause(document.hidden);
     document.addEventListener("visibilitychange", onVisibility);
+    // Selecting the subtitle plays up and down the chord, following the
+    // selection's moving edge (its focus) along the line.
+    const onSelect = () => {
+      const text = layer.querySelector(".subtitle > span")?.firstChild;
+      const sel = getSelection();
+      if (!text || !sel?.rangeCount || sel.isCollapsed || !sel.focusNode)
+        return sound.trace(null);
+      if (!sel.containsNode(text, true)) return sound.trace(null);
+      // A point of the selection along the line: 0..1, or an end if it's off
+      // either end of it.
+      const length = text.textContent?.length || 1;
+      const line = document.createRange();
+      line.selectNodeContents(text);
+      const along = (node: Node, offset: number) =>
+        node === text ? offset / length : line.comparePoint(node, offset) < 0 ? 0 : 1;
+      sound.trace(
+        along(sel.focusNode, sel.focusOffset),
+        along(sel.anchorNode!, sel.anchorOffset),
+      );
+    };
+    document.addEventListener("selectionchange", onSelect);
     let wasMelt = 0;
     let wasLoose = false;
     let wasHappy = false;
@@ -342,6 +363,7 @@ export function Showcase() {
       removeEventListener("pointerdown", resume);
       removeEventListener("keydown", resume);
       document.removeEventListener("visibilitychange", onVisibility);
+      document.removeEventListener("selectionchange", onSelect);
       sound.destroy();
       soundRef.current = null;
       cancelAnimationFrame(raf);
