@@ -1,5 +1,5 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { horizonCircle } from "filmic";
+import { horizonCircle } from "./horizonGradient";
 
 const clamp = (x: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, x));

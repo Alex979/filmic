@@ -29,7 +29,7 @@ bun lint
 
 - [x] Project setup
 - [x] WebGL groundwork: canvas, resize/DPR, full-screen pass, render loop
-- [x] Sources: `shaderSource`, procedural horizon gradient
+- [x] Sources: `shaderSource`; the horizon example's procedural gradient
 - [x] Two-pass pipeline: source -> texture -> film pass
 - [x] Film frame: effects anchored to the image (cover/contain/fill/screen/custom)
 - [x] Grain: procedural, brightness-dependent, with edge breakup

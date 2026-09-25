@@ -1,5 +1,4 @@
-import { hexToLinear, type Hex } from "../core/color";
-import { shaderSource } from "../source";
+import { hexToLinear, shaderSource, type Hex } from "filmic";
 
 /**
  * A color stop: [height above the horizon, color].

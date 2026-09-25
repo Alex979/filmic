@@ -33,7 +33,7 @@ export default function App() {
         />
         <Demo
           title="Shader"
-          note="A procedural shaderSource: renders at any size."
+          note="A shaderSource written inline: renders at any size."
           create={gradientDemo}
         />
         <Demo

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { createFilm, horizonGradient, inkFilter } from "filmic";
+import { createFilm, inkFilter } from "filmic";
+import { horizonGradient } from "./horizonGradient";
 import { createControls } from "./controls";
 import { Title } from "./Title";
 

@@ -20,6 +20,9 @@ export type { GrainOptions } from "./film/grain";
 export { DEFAULT_DUST, layoutDust } from "./film/dust";
 export type { DustOptions } from "./film/dust";
 
+export { hexToRgb, hexToLinear, srgbToLinear } from "./core/color";
+export type { Hex } from "./core/color";
+
 export { shaderSource } from "./source";
 export type {
   Source,
@@ -30,16 +33,6 @@ export type {
   SetUniforms,
 } from "./source";
 
-export {
-  horizonGradient,
-  horizonCircle,
-  DEFAULT_HORIZON_STOPS,
-} from "./sources/horizonGradient";
-export type {
-  HorizonGradientOptions,
-  HorizonStop,
-  Circle,
-} from "./sources/horizonGradient";
 export { elementSource } from "./sources/elementSource";
 export type {
   ElementSourceOptions,
