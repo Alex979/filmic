@@ -29,8 +29,8 @@ export interface BlobShape {
   /** x, y, radius of points along it, head first: the stroke through them. */
   nodes: Float32Array;
   count: number;
-  /** A circle around the whole blob: x, y, radius. */
-  bounds: [number, number, number];
+  /** A box around the whole blob: left, top, right, bottom. */
+  bounds: [number, number, number, number];
   /** The head's radius. */
   radius: number;
   /** 0 = not drawn. */
@@ -134,7 +134,7 @@ export function createBlob(): Blob {
   const shape: BlobShape = {
     nodes: new Float32Array(MAX_NODES * 3),
     count: 2 * TRAIL - 1,
-    bounds: [0, 0, 0],
+    bounds: [0, 0, 0, 0],
     radius: 0,
     opacity: 0,
     boil: 0,
@@ -214,7 +214,10 @@ export function createBlob(): Blob {
     const thin = Math.max(THINNEST, Math.sqrt(Math.min(1, (3 * r) / Math.max(length, 1e-6))));
     const at = (i: number) => Math.min(TRAIL - 1, Math.max(0, i));
     const n = shape.count;
-    let reach = r;
+    let left = Infinity;
+    let top = Infinity;
+    let right = -Infinity;
+    let bottom = -Infinity;
     for (let k = 0; k < n; k++) {
       const i = k >> 1;
       let x = xs[i];
@@ -232,11 +235,17 @@ export function createBlob(): Blob {
       shape.nodes[k * 3] = x;
       shape.nodes[k * 3 + 1] = y;
       shape.nodes[k * 3 + 2] = ri;
-      reach = Math.max(reach, Math.hypot(x - xs[0], y - ys[0]) + ri);
+      left = Math.min(left, x - ri);
+      top = Math.min(top, y - ri);
+      right = Math.max(right, x + ri);
+      bottom = Math.max(bottom, y + ri);
     }
     shape.radius = r;
-    // Room for the edge's wobble.
-    shape.bounds = [xs[0], ys[0], reach + 0.2 * r + 2];
+    // A box, not a circle: stretched out, a circle around the whole tail
+    // takes in most of the screen, and every pixel in it pays for the shape.
+    // With room for the edge's wobble.
+    const pad = 0.2 * r + 2;
+    shape.bounds = [left - pad, top - pad, right + pad, bottom + pad];
   };
 
   return {
