@@ -44,8 +44,19 @@ export function createControls(film: Film, title: TitleControls): GUI {
     .add({ fps: false }, "fps")
     .name("show fps")
     .onChange((on: boolean) => meter.show(on));
+  // R replays the intro, so a recording can start clean with the panel
+  // collapsed. Not while typing (e.g. in the title's text field).
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== "r" && e.key !== "R") return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    const target = e.target;
+    if (target instanceof Element && target.closest("input, textarea, [contenteditable]")) return;
+    title.replay();
+  };
+  window.addEventListener("keydown", onKey);
   const destroy = gui.destroy.bind(gui);
   gui.destroy = () => {
+    window.removeEventListener("keydown", onKey);
     meter.destroy();
     destroy();
   };
@@ -205,7 +216,7 @@ export function createControls(film: Film, title: TitleControls): GUI {
   fo.add(footage, "dustRate", 0, 240, 1).name("dust per frame").onChange(applyFootage);
   fo.add(footage, "dustLinger", 0, 1, 0.01).name("dust linger chance").onChange(applyFootage);
   fo.add(footage, "seed", 0, 100, 1).onChange(applyFootage);
-  fo.add(title, "replay").name("replay intro");
+  fo.add(title, "replay").name("replay intro (R)");
 
   gui
     .add(
