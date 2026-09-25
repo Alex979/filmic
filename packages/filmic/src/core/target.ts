@@ -26,6 +26,16 @@ export interface TargetFormat {
 }
 
 /**
+ * 8-bit sRGB storage for pictures. Shaders read and write linear light; the
+ * GPU encodes on write and decodes on read, so texels keep sRGB's precision
+ * in the shadows, and sampling between texels blends in linear light. Both
+ * without any conversion in the shader.
+ */
+export function srgbFormat(gl: WebGL2RenderingContext): TargetFormat {
+  return { internalFormat: gl.SRGB8_ALPHA8, format: gl.RGBA, type: gl.UNSIGNED_BYTE };
+}
+
+/**
  * Half-float storage, for passes whose faint values would band in 8 bits (e.g.
  * glows in linear light), or null if this device can't render to it.
  */

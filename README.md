@@ -144,14 +144,18 @@ void main() {
 
 The header provides `uResolution` (canvas size, CSS px), `uBufferSize` (device
 px), `uPixelRatio`, `filmPx()` (the pixel's position in CSS px, y down),
-`linearToSrgb()` and the `fragColor` output. For your own uniforms, pass a
-second argument:
+`linearToSrgb()`, `srgbToLinear()` and the `fragColor` output. For your own
+uniforms, pass a second argument:
 
 ```ts
 shaderSource(frag, (gl, uniforms, view) => {
   gl.uniform3f(uniforms.uSun, 0.7, 0.6, 0.1);
 });
 ```
+
+A shader that works in linear light (like the one above) can skip the
+conversion and write linear light to `fragColor`, with a third argument:
+`shaderSource(frag, setUniforms, { linear: true })`.
 
 For anything else, implement the `Source` interface yourself: see
 [docs/api.md](docs/api.md#custom-sources).

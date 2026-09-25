@@ -200,7 +200,7 @@ footage frame rate.
 ### shaderSource
 
 ```ts
-shaderSource(frag: string, setUniforms?: SetUniforms): Source
+shaderSource(frag: string, setUniforms?: SetUniforms, options?: { linear?: boolean }): Source
 ```
 
 A fragment shader that draws the scene. filmic prepends a header, so `frag`
@@ -213,12 +213,16 @@ provides:
 | `uBufferSize`            | `vec2`: drawing buffer size, device px.                  |
 | `uPixelRatio`            | `float`: device px per CSS px.                           |
 | `filmPx()`               | The current pixel in CSS px, origin top-left, y down.    |
-| `linearToSrgb(vec3)`     | Linear light to sRGB, for output.                        |
+| `linearToSrgb(vec3)`     | Linear light to sRGB.                                    |
+| `srgbToLinear(vec3)`     | sRGB to linear light.                                    |
 | `fragColor`              | The output: write an sRGB color.                         |
 
 `setUniforms(gl, uniforms, view)` runs before every draw: `uniforms` maps names
 to locations (array uniforms without `[0]`), `view` is the canvas size (see
 `View`).
+
+With `linear: true`, `fragColor` takes linear light instead of sRGB, which
+saves a conversion in shaders that work in linear light anyway.
 
 ### testPattern
 
@@ -244,7 +248,7 @@ interface SourceInstance {
 }
 
 interface SourceFrame {
-  texture: WebGLTexture;
+  texture: WebGLTexture; // linear light: an sRGB-format texture, or linear values
   uvScale: [number, number]; // the film pass samples at screenUv * uvScale + uvOffset
   uvOffset: [number, number]; // (screen UV: (0, 0) bottom-left)
   rect?: Rect; // where the picture sits on the canvas, for frame.fit "source"

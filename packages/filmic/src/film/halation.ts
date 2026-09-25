@@ -1,4 +1,4 @@
-import { hexToLinear, type Hex } from "../core/color";
+import { COLOR_GLSL, hexToLinear, type Hex } from "../core/color";
 import { createProgram, FULLSCREEN_VERT } from "../core/gl";
 import {
   createRenderTarget,
@@ -63,8 +63,9 @@ vec3 load(vec3 c) { return ${encode ? "c * c" : "c"}; }
 `;
 
 /**
- * Pick out the highlights (in linear light) and halve the resolution. Four
- * bilinear reads cover a 4x4 block, so small highlights don't shimmer.
+ * Pick out the highlights and halve the resolution. Four bilinear reads cover
+ * a 4x4 block, so small highlights don't shimmer. The input is linear light
+ * (see SourceFrame); the threshold is on brightness as seen on screen.
  */
 const prefilterFrag = (encode: boolean) => /* glsl */ `#version 300 es
 precision highp float;
@@ -78,12 +79,13 @@ uniform float uThreshold;
 
 out vec4 fragColor;
 ${codec(encode)}
+${COLOR_GLSL}
 
 vec3 highlight(vec2 uv) {
   vec3 c = texture(uInput, uv * uUvScale + uUvOffset).rgb;
-  float L = dot(c, vec3(.2126, .7152, .0722));
+  float L = dot(linearToSrgb(c), vec3(.2126, .7152, .0722));
   float w = smoothstep(0., 1., (L - uThreshold) / max(1. - uThreshold, 1e-3));
-  return pow(max(c, 0.), vec3(2.2)) * w;
+  return c * w;
 }
 
 void main() {
@@ -140,9 +142,9 @@ void main() {
 }`;
 
 /**
- * GLSL for the film pass: add the glow to an sRGB color. The glow's strength
- * comes mostly from the highlights' red and green, since blue light is
- * absorbed before it reaches the base; its color is `color`.
+ * GLSL for the film pass: add the glow to a color in linear light. The glow's
+ * strength comes mostly from the highlights' red and green, since blue light
+ * is absorbed before it reaches the base; its color is `color`.
  */
 export const HALATION_GLSL = /* glsl */ `
 uniform bool uHaloOn;
@@ -160,9 +162,7 @@ vec3 applyHalation(vec3 c, vec2 uv) {
   float glow = dot(mix(tail, core, uHaloCoreMix), vec3(.5, .38, .12));
   // Screen, not add: the glow lights up darker surroundings, but the
   // highlight itself, already near white, stays white instead of turning pink.
-  vec3 lin = pow(clamp(c, 0., 1.), vec3(2.2));
-  lin = 1. - (1. - lin) * (1. - clamp(uHaloColor * glow, 0., 1.));
-  return pow(lin, vec3(1. / 2.2));
+  return 1. - (1. - clamp(c, 0., 1.)) * (1. - clamp(uHaloColor * glow, 0., 1.));
 }
 `;
 

@@ -1,5 +1,6 @@
+import { COLOR_GLSL } from "./core/color";
 import { createProgram, FULLSCREEN_VERT, type Uniforms } from "./core/gl";
-import { createRenderTarget } from "./core/target";
+import { createRenderTarget, srgbFormat } from "./core/target";
 import type { Rect } from "./film/frame";
 
 /** Size information for the frame being drawn. */
@@ -44,6 +45,10 @@ export interface SourceInstance {
 /**
  * One frame of a source: a texture, and how it lines up with the screen.
  *
+ * The texture holds linear light: either an sRGB-format texture, which the
+ * GPU decodes as it's read (filmic's own render targets are `SRGB8_ALPHA8`),
+ * or linear values in any other format.
+ *
  * The film pass works in screen UV: (0, 0) is the bottom-left of the canvas and
  * (1, 1) the top-right (WebGL's convention). It samples the texture at
  * `screenUv * uvScale + uvOffset`, which lets a source flip, crop or letterbox
@@ -65,7 +70,8 @@ export interface SourceFrame {
 
 /**
  * Prepended to every shaderSource fragment shader, so a source only needs to
- * write `void main() { fragColor = ...; }`.
+ * write `void main() { fragColor = ...; }`. The shader's `main` is renamed, so
+ * the footer below can run it and store what it wrote as linear light.
  */
 const SOURCE_HEADER = /* glsl */ `#version 300 es
 precision highp float;
@@ -74,20 +80,24 @@ uniform vec2 uResolution;   // canvas size in CSS px
 uniform vec2 uBufferSize;   // drawing buffer size in device px
 uniform float uPixelRatio;  // device px per CSS px
 
-out vec4 fragColor;
+vec4 fragColor;
 
 // The current pixel in CSS px: origin top-left, y down, like the page.
 vec2 filmPx() {
   return vec2(gl_FragCoord.x, uBufferSize.y - gl_FragCoord.y) / uPixelRatio;
 }
-
-// Linear light -> sRGB for output.
-vec3 linearToSrgb(vec3 l) {
-  l = max(l, 0.);
-  return mix(l * 12.92, 1.055 * pow(l, vec3(1. / 2.4)) - .055, step(.0031308, l));
-}
-
+${COLOR_GLSL}
+#define main filmicSourceMain
 #line 1
+`;
+
+const sourceFooter = (linear: boolean) => /* glsl */ `
+#undef main
+out vec4 filmicOut;
+void main() {
+  filmicSourceMain();
+  filmicOut = vec4(${linear ? "max(fragColor.rgb, 0.)" : "srgbToLinear(fragColor.rgb)"}, fragColor.a);
+}
 `;
 
 export type SetUniforms = (
@@ -96,24 +106,37 @@ export type SetUniforms = (
   view: View,
 ) => void;
 
+export interface ShaderSourceOptions {
+  /**
+   * The shader writes linear light to `fragColor` rather than sRGB. Saves a
+   * conversion for shaders that work in linear light anyway. Default false.
+   */
+  linear?: boolean;
+}
+
 /**
  * A source drawn by a fragment shader. The shader gets the header above
- * (uResolution, uPixelRatio, filmPx(), linearToSrgb(), fragColor) and writes
- * sRGB colors to `fragColor`. `setUniforms` runs before each draw to pass in
- * any extra uniforms the shader declares.
+ * (uResolution, uPixelRatio, filmPx(), linearToSrgb(), srgbToLinear(),
+ * fragColor) and writes sRGB colors to `fragColor`, or linear light with
+ * `linear: true`. `setUniforms` runs before each draw to pass in any extra
+ * uniforms the shader declares.
  *
  * It renders into its own texture at canvas resolution, which the film pass
  * then reads.
  */
-export function shaderSource(frag: string, setUniforms?: SetUniforms): Source {
+export function shaderSource(
+  frag: string,
+  setUniforms?: SetUniforms,
+  options: ShaderSourceOptions = {},
+): Source {
   return {
     create(gl) {
       const { program, uniforms } = createProgram(
         gl,
         FULLSCREEN_VERT,
-        SOURCE_HEADER + frag,
+        SOURCE_HEADER + frag + sourceFooter(options.linear ?? false),
       );
-      const target = createRenderTarget(gl);
+      const target = createRenderTarget(gl, srgbFormat(gl));
       return {
         render(view) {
           target.resize(view.bufferWidth, view.bufferHeight);

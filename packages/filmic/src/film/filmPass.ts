@@ -1,3 +1,4 @@
+import { COLOR_GLSL } from "../core/color";
 import { createProgram, FULLSCREEN_VERT } from "../core/gl";
 import type { SourceFrame, View } from "../source";
 import { createDust, DUST_GLSL, type DustOptions } from "./dust";
@@ -55,6 +56,7 @@ uniform float uExposure;    // footage flicker, as a gain on sRGB values
 out vec4 fragColor;
 
 // Sample the source at a screen UV ((0, 0) bottom-left, (1, 1) top-right).
+// The source is linear light (see SourceFrame).
 vec3 sampleSource(vec2 uv) {
   return texture(uSource, uv * uUvScale + uUvOffset).rgb;
 }
@@ -64,6 +66,7 @@ vec2 filmToUv(vec2 d) {
   return d / uFilmScale * uPixelRatio / uBufferSize * vec2(1., -1.);
 }
 
+${COLOR_GLSL}
 ${HALATION_GLSL}
 ${GRAIN_GLSL}
 ${MOTTLE_GLSL}
@@ -88,8 +91,10 @@ void main() {
   // 1. Emulsion: sample the (already optically softened) image through
   //    grain-driven offsets, so edges break up into grain.
   vec3 c = sampleSource(onFilm + filmToUv(grainBreakup(filmPx)));
-  // 2. Halation: highlights glow through the film base.
-  c = applyHalation(c, onFilm);
+  // 2. Halation: highlights glow through the film base. Light adds in linear
+  //    light; from here on, values are sRGB, as they'll be shown (and as the
+  //    grain and mottle strengths were measured).
+  c = linearToSrgb(applyHalation(c, onFilm));
   // 3. Flicker: this frame's exposure.
   c *= uExposure;
   // 4. Mottle: faint, soft blotches of density and color.
