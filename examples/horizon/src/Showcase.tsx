@@ -145,7 +145,14 @@ export function Showcase() {
     };
     let tap: { id: number; x: number; y: number; t: number } | null = null;
     const onDown = (e: PointerEvent) => {
-      if (e.pointerType !== "touch") return cursor.press(true);
+      if (e.pointerType !== "touch") {
+        // Most of the page can't be selected (see .page), so the browser
+        // leaves a selection alone when you click it. Clear it by hand.
+        const el = e.target as Element;
+        if (e.button === 0 && !el.closest?.(".title, .subtitle, .lil-gui"))
+          getSelection()?.removeAllRanges();
+        return cursor.press(true);
+      }
       if ((e.target as Element).closest?.(".lil-gui")) return;
       tap = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
     };

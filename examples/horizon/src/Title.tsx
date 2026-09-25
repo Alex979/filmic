@@ -272,7 +272,11 @@ export function Title({
                   : undefined
               }
             >
-              <g transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}>
+              {/* The ink prints whatever the text becomes, melted or not. */}
+              <g
+                transform={lift ? `translate(0 ${lift.toFixed(1)})` : undefined}
+                style={{ filter }}
+              >
                 <text
                   ref={textRef}
                   className="title"
@@ -282,7 +286,7 @@ export function Title({
                   textAnchor="middle"
                   opacity={o > 0.001 && !hidden ? 1 : 0}
                   letterSpacing={m > 0 ? `${squeeze.toFixed(4)}em` : undefined}
-                  style={{ filter: m > 0 ? `url(#${uid}-melt)` : filter }}
+                  style={{ filter: m > 0 ? `url(#${uid}-melt)` : undefined }}
                   mask={sweep < 1 ? `url(#${uid}-sweep-mask)` : undefined}
                 >
                   <textPath href={`#${uid}-arc`} startOffset="50%">
