@@ -1,3 +1,5 @@
+import { clamp } from "./math";
+
 /**
  * The page's sound, all synthesized (no files):
  *
@@ -341,7 +343,7 @@ export function createSound(): Sound {
     },
     motion(x, speed) {
       if (!on) return;
-      const s = Math.min(Math.max(speed, 0), 1);
+      const s = clamp(speed, 0, 1);
       ease(windFilter.frequency, 260 + 1300 * s, 0.07);
       ease(windGain.gain, 0.16 * Math.pow(s, 1.6), 0.07);
       ease(windPan.pan, (x * 2 - 1) * 0.7, 0.1);
@@ -356,7 +358,7 @@ export function createSound(): Sound {
     },
     chime(x, y) {
       const scale = notes();
-      const i = Math.round((1 - Math.min(Math.max(y, 0), 1)) * (scale.length - 1));
+      const i = Math.round((1 - clamp(y, 0, 1)) * (scale.length - 1));
       bell(midi(scale[i]), 0.11, 0, (x * 2 - 1) * 0.8);
     },
     melt() {
@@ -378,7 +380,7 @@ export function createSound(): Sound {
         return;
       }
       const note = (q: number) =>
-        Math.round(Math.min(Math.max(q, 0), 1) * (TRACE_NOTES - 1));
+        Math.round(clamp(q, 0, 1) * (TRACE_NOTES - 1));
       const i = note(p);
       if (i === traced) return;
       // On from where it last was (or where a new selection began),

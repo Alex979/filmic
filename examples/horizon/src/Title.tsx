@@ -7,10 +7,8 @@ import {
   type ReactNode,
 } from "react";
 import { horizonCircle } from "./horizonGradient";
+import { clamp } from "./math";
 import type { Anchor } from "./play";
-
-const clamp = (x: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, x));
 
 const ease = {
   in: (t: number) => t * t,

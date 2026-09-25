@@ -1,4 +1,5 @@
 import type { Hex } from "filmic";
+import { clamp } from "./math";
 
 /**
  * A planet's horizon at sunset, seen from high up.
@@ -66,9 +67,6 @@ export const COLUMNS = 5;
 const APEX_IN_FRAME = 0.4913;
 const RADIUS = 5.6191;
 export const ARC_SPAN = 1.9418;
-
-const clamp = (x: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, x));
 
 /** Where the horizon is on a given canvas, in CSS px. */
 export interface HorizonGeometry {

@@ -8,6 +8,7 @@ import {
   horizonView,
   type HorizonRow,
 } from "./horizonGradient";
+import { clamp } from "./math";
 
 /**
  * The whole scene behind the page, in one shader:
@@ -248,7 +249,7 @@ void main() {
       const { scroll, blob } = frame(view);
       const g = horizonView(view.width, view.height, scroll);
       gl.uniform4f(u.uHorizon, g.cx, g.cy, g.r, g.scale);
-      const t = Math.min(Math.max(scroll / (DETAIL_IN * view.height), 0), 1);
+      const t = clamp(scroll / (DETAIL_IN * view.height), 0, 1);
       const detail = t * t * (3 - 2 * t);
       gl.uniform3f(u.uPlanet, g.spin, g.r / g.scale / CLOUD_SIZE, detail);
       gl.uniform1i(u.uRowCount, rows.length);

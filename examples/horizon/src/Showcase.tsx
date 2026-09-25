@@ -4,6 +4,7 @@ import { createFilm, inkFilter, type Film } from "filmic";
 import { createControls } from "./controls";
 import { createCursor } from "./cursor";
 import { HORIZON_FILM, HORIZON_INK } from "./look";
+import { clamp } from "./math";
 import { createPlay } from "./play";
 import { createRipples } from "./ripples";
 import { horizonScene } from "./scene";
@@ -30,9 +31,6 @@ const SOUND_KEY = "filmic-horizon-sound";
 // Controls that aren't part of the scene: pressing them doesn't chime or
 // move the target.
 const UI = ".lil-gui, .sound";
-
-const clamp = (x: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, x));
 
 /**
  * The page: a filmed planet behind everything, the curved title over it, and

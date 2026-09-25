@@ -1,4 +1,5 @@
 import { createBlob, type BlobShape } from "./blob";
+import { clamp, spring } from "./math";
 
 /**
  * What happens below the hero: scroll far enough and the title melts into a
@@ -82,9 +83,6 @@ const ORBIT_SPEED = 2.1;
 // (rad/s, critically damped: it starts gently, with no kick).
 const ORBIT_IN = 2.6;
 const ORBIT_OUT = 9;
-
-const clamp = (x: number, lo: number, hi: number) =>
-  Math.min(hi, Math.max(lo, x));
 
 export function createPlay(): Play {
   const blob = createBlob();
@@ -181,8 +179,8 @@ export function createPlay(): Play {
         const steps = Math.ceil(blobDt * 240);
         for (let i = 0; i < steps; i++) {
           const h = blobDt / steps;
-          orbitV += (w * w * ((idle ? 1 : 0) - orbit) - 2 * w * orbitV) * h;
-          orbit = clamp(orbit + orbitV * h, 0, 1);
+          [orbit, orbitV] = spring(orbit, orbitV, idle ? 1 : 0, w, 1, h);
+          orbit = clamp(orbit, 0, 1);
           // It speeds up as it swings out, so it starts off heading straight.
           angle += h * spin * ORBIT_SPEED * orbit;
         }

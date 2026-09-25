@@ -1,3 +1,5 @@
+import { clamp, spring } from "./math";
+
 /**
  * The blob: a drop of the title's ink that chases a target.
  *
@@ -148,11 +150,8 @@ export function createBlob(): Blob {
     const dy = lookY - ys[0];
     const d = Math.hypot(dx, dy);
     const far = d / (d + LOOK_FAR * r) / Math.max(d, 1e-6);
-    const w = LOOK_OMEGA;
-    turnVX += (w * w * (dx * far - turnX) - 2 * LOOK_DAMPING * w * turnVX) * h;
-    turnVY += (w * w * (dy * far - turnY) - 2 * LOOK_DAMPING * w * turnVY) * h;
-    turnX += turnVX * h;
-    turnY += turnVY * h;
+    [turnX, turnVX] = spring(turnX, turnVX, dx * far, LOOK_OMEGA, LOOK_DAMPING, h);
+    [turnY, turnVY] = spring(turnY, turnVY, dy * far, LOOK_OMEGA, LOOK_DAMPING, h);
   };
 
   const mood = (dt: number) => {
@@ -168,8 +167,8 @@ export function createBlob(): Blob {
   // Each eye on the ball of the head, turned, then seen from the front.
   const eyes = () => {
     const r = Math.max(radius, 0.5);
-    const yaw = YAW * Math.max(-1, Math.min(1, turnX));
-    const pitch = PITCH * Math.max(-1, Math.min(1, turnY)) - EYE_RISE;
+    const yaw = YAW * clamp(turnX, -1, 1);
+    const pitch = PITCH * clamp(turnY, -1, 1) - EYE_RISE;
     for (let e = 0; e < 2; e++) {
       const a = yaw + (e ? EYE_SPREAD : -EYE_SPREAD);
       shape.eyes[e * 4] = xs[0] + r * Math.sin(a) * Math.cos(pitch);
@@ -282,16 +281,9 @@ export function createBlob(): Blob {
       const steps = Math.ceil(dt / SUBSTEP);
       const h = steps ? dt / steps : 0;
       for (let s = 0; s < steps; s++) {
-        vx += (OMEGA * OMEGA * (gx - xs[0]) - 2 * DAMPING * OMEGA * vx) * h;
-        vy += (OMEGA * OMEGA * (gy - ys[0]) - 2 * DAMPING * OMEGA * vy) * h;
-        xs[0] += vx * h;
-        ys[0] += vy * h;
-
-        radiusV +=
-          (SIZE_OMEGA * SIZE_OMEGA * (r - radius) -
-            2 * SIZE_DAMPING * SIZE_OMEGA * radiusV) *
-          h;
-        radius += radiusV * h;
+        [xs[0], vx] = spring(xs[0], vx, gx, OMEGA, DAMPING, h);
+        [ys[0], vy] = spring(ys[0], vy, gy, OMEGA, DAMPING, h);
+        [radius, radiusV] = spring(radius, radiusV, r, SIZE_OMEGA, SIZE_DAMPING, h);
 
         follow(h);
         look(h);
