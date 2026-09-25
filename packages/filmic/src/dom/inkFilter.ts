@@ -84,7 +84,8 @@ export interface InkFilter {
    * The ink's halation glow as a CSS filter value, `var(--id-glow)`. Put it
    * on the element directly around the inked one, not on the inked element
    * itself (see above). The custom property is set on the page's root element
-   * and follows `set()`, so stylesheets can use `var(--id-glow)` too.
+   * and follows `set()`, so stylesheets can use `var(--id-glow)` too (with
+   * the id escaped, if it isn't a CSS identifier).
    */
   readonly glow: string;
   /** Current options. */
@@ -200,7 +201,9 @@ export function inkFilter(
     return [shadow(0.21, 0.45, 0.1), shadow(0.71, 0.5), shadow(2, 0.45)].join(" ");
   };
   // With no glow the property still holds a filter that does nothing, so a
-  // filter list that includes var(--id-glow) stays valid.
+  // filter list that includes var(--id-glow) stays valid. Any id makes a
+  // property name, but in var() it has to be escaped (React's useId() ids,
+  // like ":r1:", aren't CSS identifiers).
   const property = `--${id}-glow`;
   const publish = () =>
     document.documentElement.style.setProperty(
@@ -215,7 +218,7 @@ export function inkFilter(
   return {
     id,
     url: `url(#${id})`,
-    glow: `var(${property})`,
+    glow: `var(${CSS.escape(property)})`,
     get options() {
       return { ...current };
     },

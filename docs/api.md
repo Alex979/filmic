@@ -287,8 +287,9 @@ The halation glow goes on the element *around* the inked one, not on it:
 </p>
 ```
 
-`ink.glow` is that `var(--id-glow)` value; the custom property lives on the
-page's root element and follows `set()`. The glow is CSS `drop-shadow()`
+`ink.glow` is that `var(--id-glow)` value, with the id escaped if it isn't a
+CSS identifier (React's `useId()` ids, for one); the custom property lives on
+the page's root element and follows `set()`. The glow is CSS `drop-shadow()`
 layers, and Safari clips them when they share an element with the SVG filter,
 and ignores them on SVG elements, so SVG text takes its glow from an HTML
 parent. The glowing element can animate `opacity` and `transform` freely.
