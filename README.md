@@ -42,7 +42,8 @@ bun lint
 - [x] Ink: `inkFilter()` gives DOM text and elements a printed look; curved title in the horizon example
 - [x] Footage: frame clock at any fps, weave, flicker, per-frame grain and dust; `film.on("frame")`, `frameTime()`, `attach()` and `sync()` for the DOM
 - [ ] Controls panel
-- [ ] Horizon source: the reference's curvature and placement, cloud-like variation in the sky
+- [x] Horizon example: the reference's curvature, placement, and colors along the horizon
+- [ ] Horizon example: cloud-like texture along the horizon
 - [ ] Page overlay: real grain and dust over DOM content
 - [ ] Filmed text (opt-in): draw DOM text into the film itself
 - [ ] Look (optional): tone curve, halation, vignette
