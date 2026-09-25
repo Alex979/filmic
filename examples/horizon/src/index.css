@@ -108,14 +108,19 @@ body {
 }
 
 .film-layer .subtitle {
+  position: relative; /* for the rise, see subtitle-in */
+  top: 0; /* not auto, which can't be animated */
   pointer-events: auto; /* selectable */
   /* Stepped at the footage frame rate by film.sync(). */
   animation: subtitle-in 1.2s cubic-bezier(0.33, 1, 0.68, 1) 1.35s both;
 }
 
+/* Fades with color and rises with top, not opacity and transform: Safari
+   gives elements animating those their own layer, which the layer's
+   halation glow (a filter on .film-layer) doesn't reach until it ends. */
 @keyframes subtitle-in {
   from {
-    opacity: 0;
-    transform: translateY(0.5em);
+    color: transparent;
+    top: 0.5em;
   }
 }

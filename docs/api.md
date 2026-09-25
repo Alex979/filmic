@@ -284,7 +284,9 @@ them: `film.attach(wrapper, { ink })` does this for you. Without `attach`, set
 `filter: var(--id-glow)` on a wrapper yourself (`ink.glow` is that value; the
 custom property lives on the page's root element and follows `set()`). The
 glow is CSS `drop-shadow()` layers, which Safari ignores on SVG elements and
-clips when they follow an SVG filter, hence the wrapper.
+clips when they follow an SVG filter, hence the wrapper. In Safari, a child
+that animates `opacity` or `transform` misses the glow until the animation
+ends; animate `color` and `top` instead.
 
 The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and

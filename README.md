@@ -202,12 +202,14 @@ gives them the same look:
   filter: url(#title-ink);
 }
 .tagline {
+  position: relative;
+  top: 0;
   animation: fade-up 1.2s 0.6s both;
 }
 @keyframes fade-up {
   from {
-    opacity: 0;
-    transform: translateY(0.5em);
+    color: transparent; /* not opacity or transform: see "Good to know" */
+    top: 0.5em;
   }
 }
 ```
@@ -302,6 +304,10 @@ Every option and default is listed in [docs/api.md](docs/api.md).
   curve (e.g. SVG `textPath`) can jitter by a pixel as the ink boils, because
   browsers snap upright glyphs to whole pixels. An invisible
   `transform: skewX(0.05deg)` on the text fixes it.
+- **Animating glowing text in Safari:** Safari gives elements that animate
+  `opacity` or `transform` their own layer, which the halation glow on the
+  attached wrapper doesn't reach until the animation ends, so the glow pops in.
+  Fade with `color` and move with `top` or `margin` instead.
 - **Editable inked text:** browsers skip SVG filters on zero-size elements, so
   give an emptiable editable element some padding, or its cursor shows
   unfiltered.
