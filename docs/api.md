@@ -292,6 +292,7 @@ from CSS before it exists.
 | `halation`       | `0`         | Halation: a warm glow around light ink, on the canvas's scale.    |
 | `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
 | `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
+| `halationTail`   | `"auto"`    | Its widest layer: `true`, `false` or `"auto"` (see below).        |
 
 The halation glow goes on the element *around* the inked one, not on it:
 
@@ -308,9 +309,20 @@ layers, and Safari clips them when they share an element with the SVG filter,
 and ignores them on SVG elements, so SVG text takes its glow from an HTML
 parent. The glowing element can animate `opacity` and `transform` freely.
 
+The glow's widest layer, its tail, costs the most to paint: the CPU blurs it,
+at a cost of about the square of its radius in device pixels. On a 3x phone
+screen it's most of the glow's cost, and it barely shows at that density, so
+`"auto"` leaves it out at 2.5 or more device pixels per CSS px (and follows
+the screen as that changes). `true` or `false` keeps it or drops it anywhere.
+
 The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and
 `destroy()`.
+
+While the ink holds still (frame `0`), the filter tiles its noise from an image
+rendered once per `seed` and screen pixel ratio, which Safari paints in about a
+third of the time live noise takes. A boiling ink (`setFrame` with a nonzero frame)
+computes the noise live on every frame.
 
 Sizes are in CSS px, so small text looks softer than large text; lower
 `softness` for body copy. Browsers skip filters on zero-size elements: keep
