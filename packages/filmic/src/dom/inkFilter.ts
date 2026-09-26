@@ -136,25 +136,34 @@ let count = 0;
 
 // Noise tiles, shared by every filter with the same seed and pixel ratio, as
 // object URLs of PNGs.
-const tiles = new Map<string, { url: Promise<string>; users: number }>();
+interface Tile {
+  key: string;
+  url: Promise<string>;
+  users: number;
+}
+const tiles = new Map<string, Tile>();
 
 const tileKey = (seed: number, ratio: number) => `${seed}@${ratio}`;
 
-function holdTile(seed: number, ratio: number): Promise<string> {
+function holdTile(seed: number, ratio: number): Tile {
   const key = tileKey(seed, ratio);
   let tile = tiles.get(key);
   if (!tile) {
-    tile = { url: renderTile(seed, ratio), users: 0 };
-    tiles.set(key, tile);
+    const made: Tile = { key, url: renderTile(seed, ratio), users: 0 };
+    // A failed render isn't kept, so the next filter to ask tries again.
+    made.url.catch(() => {
+      if (tiles.get(key) === made) tiles.delete(key);
+    });
+    tiles.set(key, made);
+    tile = made;
   }
   tile.users++;
-  return tile.url;
+  return tile;
 }
 
-function releaseTile(key: string) {
-  const tile = tiles.get(key);
-  if (!tile || --tile.users > 0) return;
-  tiles.delete(key);
+function releaseTile(tile: Tile) {
+  if (--tile.users > 0) return;
+  if (tiles.get(tile.key) === tile) tiles.delete(tile.key);
   tile.url.then(URL.revokeObjectURL, () => {});
 }
 
@@ -281,10 +290,11 @@ export function inkFilter(
   const holes = el("feColorMatrix", { in: "n", type: "matrix", result: "holes" }, filter);
   el("feComposite", { in: "ink", in2: "holes", operator: "in" }, filter);
 
-  // The tile this filter holds (its key), and whether it's ready to use.
-  let held: string | null = null;
+  // The tile this filter holds, and whether it's ready to use. A tile that
+  // failed to render stays held, unready, so the filter computes the noise
+  // live and tries again only once the seed or pixel ratio changes.
+  let held: Tile | null = null;
   let ready = false;
-  let failed = false;
   let ticket = 0;
   let wired = false;
   let destroyed = false;
@@ -309,25 +319,23 @@ export function inkFilter(
     const seed = 4 + Math.max(0, Math.floor(current.seed));
     const ratio = window.devicePixelRatio || 1;
     const key = tileKey(seed, ratio);
-    if (frame === 0 && key !== held && !failed) {
+    if (frame === 0 && key !== held?.key) {
       wire(false);
       if (held) releaseTile(held);
-      held = key;
+      held = holdTile(seed, ratio);
       ready = false;
       const mine = ++ticket;
-      holdTile(seed, ratio).then(
+      held.url.then(
         (url) => {
           if (mine !== ticket) return;
           image.setAttribute("href", url);
           ready = true;
           route();
         },
-        () => {
-          if (mine === ticket) failed = true;
-        },
+        () => {}, // live noise it is (see held)
       );
     }
-    wire(frame === 0 && ready && key === held);
+    wire(frame === 0 && ready && key === held?.key);
   };
 
   // Watch for the pixel ratio changing (a zoom, a move to another screen):
@@ -346,10 +354,20 @@ export function inkFilter(
     publish();
   };
 
+  // The live noise's seed, the one attribute that changes every boil step.
+  // The turbulence keeps it while it's out of the filter (tiling), so it's
+  // right whenever it's wired back in.
+  let seeded = "";
+  const applySeed = () => {
+    const seed = String(4 + Math.max(0, Math.floor(current.seed)) + (frame % 997));
+    if (seed === seeded) return;
+    seeded = seed;
+    turbulence.setAttribute("seed", seed);
+  };
+  // Everything else, which only set() changes.
   const apply = () => {
     const o = current;
-    const seed = Math.max(0, Math.floor(o.seed)) + (frame % 997);
-    turbulence.setAttribute("seed", String(4 + seed));
+    applySeed();
     displace.setAttribute("scale", String(o.roughness * EDGE_GAIN));
     blur.setAttribute("stdDeviation", String(o.softness));
     firm.setAttribute("slope", String(o.firmness));
@@ -419,7 +437,7 @@ export function inkFilter(
       const next = Math.max(0, Math.floor(n));
       if (next === frame) return;
       frame = next;
-      apply();
+      applySeed();
       route();
     },
     destroy() {

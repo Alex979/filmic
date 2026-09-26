@@ -54,7 +54,9 @@ export interface SourceInstance {
  * `screenUv * uvScale + uvOffset`, which lets a source flip, crop or letterbox
  * its texture without an extra pass: a texture rendered by filmic at canvas
  * size uses scale (1, 1) and offset (0, 0); an uploaded image, whose first row
- * is its top, flips y with scale (1, -1) and offset (0, 1).
+ * is its top, flips y with scale (1, -1) and offset (0, 1). With that identity
+ * mapping the texture must be the view's buffer size: the optical blur then
+ * takes its pixels to line up 1:1 with the screen's.
  */
 export interface SourceFrame {
   texture: WebGLTexture;
@@ -126,7 +128,9 @@ export interface ShaderSourceOptions {
  * (uResolution, uPixelRatio, filmPx(), linearToSrgb(), srgbToLinear(),
  * fragColor) and writes sRGB colors to `fragColor`, or linear light with
  * `linear: true`. `setUniforms` runs before each draw to pass in any extra
- * uniforms the shader declares.
+ * uniforms the shader declares. Because of the header, the shader must not
+ * define `srgbToLinear` or `linearToSrgb`, or use `main` as any name but its
+ * entry point's.
  *
  * It renders into its own texture at canvas resolution, which the film pass
  * then reads.

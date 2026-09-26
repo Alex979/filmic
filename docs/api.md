@@ -45,7 +45,7 @@ Throws if WebGL 2 isn't available.
 | `frameTime(now?)`               | `now` (default `performance.now()`) stepped to the start of its footage frame while footage plays; else `now`. |
 | `attach(element, options?)`     | Move an element with the film. Returns a detach function. See [attach](#filmattach).                         |
 | `sync(element)`                 | Step an element's CSS animations at the footage rate. Returns a stop function. See [sync](#filmsync).        |
-| `destroy()`                     | Stop drawing and free GPU resources. The canvas can be handed to `createFilm` again.                          |
+| `destroy()`                     | Stop drawing, detach everything attached or synced, and free GPU resources. The canvas can be handed to `createFilm` again. |
 
 ## Settings
 
@@ -224,6 +224,12 @@ to locations (array uniforms without `[0]`), `view` is the canvas size (see
 With `linear: true`, `fragColor` takes linear light instead of sRGB, which
 saves a conversion in shaders that work in linear light anyway.
 
+Reserved names: the header defines `srgbToLinear()` and `linearToSrgb()`, and
+renames the shader's `main` with `#define main filmicSourceMain` so it can run
+it and convert what it wrote. So `frag` must not define `srgbToLinear` or
+`linearToSrgb` itself, and must not use `main` as a name for anything but its
+entry point (a variable, a field or a macro).
+
 ### testPattern
 
 ```ts
@@ -260,9 +266,20 @@ interface SourceFrame {
 A texture rendered at canvas size uses scale `[1, 1]` and offset `[0, 0]`; an
 uploaded image, whose first row is its top, uses `[1, -1]` and `[0, 1]`.
 
+A texture with that identity mapping (scale `[1, 1]`, offset `[0, 0]`) is
+expected to be the view's buffer size (`view.bufferWidth` by
+`view.bufferHeight`): the optical blur then reads it two pixels at a time.
+With any other mapping it reads every pixel on its own, which is exact at any
+size but takes twice the reads in its first pass.
+
 The film reads the texture as linear light. An `SRGB8_ALPHA8` texture (what
 filmic's own sources render into) is decoded by the GPU as it's read, so it
 works as is; any other format must hold linear values.
+
+This is a change: sources used to hand the film sRGB values. A custom source
+that returns plain `RGBA8` (not sRGB-format) textures holding sRGB pixels now
+renders too dark. Upload or render into an sRGB-format texture
+(`SRGB8_ALPHA8`), or write linear values.
 
 `version` lets the film skip work: while the same texture comes back with the
 same `version` (and the canvas hasn't resized), the optical blur and halation
@@ -356,13 +373,20 @@ while desktop Safari drops about one in six and a page of boiling paragraphs
 costs nothing measurable on either. So with `"auto"` the ink boils from the
 start while `attach` watches the screen's frames (only while footage plays and
 the element is on screen). A boil step counts as late if any frame before the
-next step took over 1.25x the median frame. Once 16 of the last 24 steps (2 s
-at 12 fps) were late, the ink stops boiling and holds still for good; weave and
-flicker carry on. On phones this usually turns the boil off within about 2 s
-of it showing; on desktops it usually keeps boiling, and a brief stutter
-doesn't stop it. It decides once per `attach`, stores nothing, and its watching
-is a few arithmetic operations per frame, which stop once it turns the boil
-off. `true` and `false` don't watch.
+next step took over 1.25x the screen's usual frame (the median frame without a
+boil step, and at least 1/60 s, so over 20.8 ms at 60 Hz or faster). Once 16 of
+the last 24 steps (2 s at 12 fps) were late, the ink stops boiling and holds
+still for good; weave and flicker carry on. On phones this usually turns the
+boil off within about 2 s of it showing; on desktops it usually keeps boiling,
+and a brief stutter doesn't stop it. Its watching is a few arithmetic
+operations per frame, which stop once it turns the boil off. `true` and
+`false` don't watch.
+
+The decision is the ink filter's, for as long as the page lives: once an
+`"auto"` attachment stops an ink, every `"auto"` attachment that uses it
+leaves it still (so a filter shared between elements doesn't keep boiling
+through another one), and one whose inks are all stopped shows `"off"`. An
+attachment with `boil: true` still boils it.
 
 With `ink`, the element's `data-filmic-boil` attribute shows the boil's state:
 `"on"` or `"off"`.

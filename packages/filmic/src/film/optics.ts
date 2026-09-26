@@ -20,8 +20,8 @@ export const DEFAULT_OPTICS: OpticsOptions = {
 
 /** Largest blur radius, in device px, per pass. */
 const MAX_RADIUS = 48;
-/** Reads each side of the center in one pass: one per pair of pixels. */
-const MAX_TAPS = MAX_RADIUS / 2;
+/** Reads each side of the center in one pass: one per pixel, at most. */
+const MAX_TAPS = MAX_RADIUS;
 
 /**
  * One direction of a separable gaussian blur. Run horizontally, then
@@ -31,7 +31,9 @@ const MAX_TAPS = MAX_RADIUS / 2;
  * Works in linear light (so bright edges don't go muddy). The textures are
  * sRGB (see srgbFormat), so the GPU does the conversions, and blends between
  * pixels in linear light: one read placed between two pixels, weighted by
- * their combined weight, adds up to exactly the two reads it replaces.
+ * their combined weight, adds up to exactly the two reads it replaces. That
+ * holds only where the input's pixels line up 1:1 with the output's, so an
+ * input with any other mapping gets a read per pixel (see pairTaps).
  */
 const BLUR_FRAG = /* glsl */ `#version 300 es
 precision highp float;
@@ -75,9 +77,29 @@ export function gaussianWeights(sigma: number) {
 }
 
 /**
+ * One read per pixel, at 1, 2, 3, ... px: for an input that doesn't line up
+ * 1:1 with the output, where reads between pixels would blend the wrong ones.
+ * Fills `offsets` and `weights` and returns the read count.
+ */
+export function plainTaps(
+  w: number[],
+  offsets: Float32Array,
+  weights: Float32Array,
+): number {
+  offsets.fill(0);
+  weights.fill(0);
+  for (let i = 0; i < w.length; i++) {
+    offsets[i] = i;
+    weights[i] = w[i];
+  }
+  return w.length - 1;
+}
+
+/**
  * Fold per-pixel weights into reads between pixel pairs (1 and 2, 3 and 4,
  * ...): each read has the pair's combined weight and lands where the pair's
- * weights balance. Fills `offsets` and `weights` and returns the read count.
+ * weights balance. Exact only when the input's pixels line up 1:1 with the
+ * output's. Fills `offsets` and `weights` and returns the read count.
  */
 export function pairTaps(
   w: number[],
@@ -120,16 +142,36 @@ export function createOptics(gl: WebGL2RenderingContext): Optics {
   );
   const horizontal = createRenderTarget(gl, srgbFormat(gl));
   const vertical = createRenderTarget(gl, srgbFormat(gl));
-  const offsets = new Float32Array(MAX_TAPS + 1);
-  const weights = new Float32Array(MAX_TAPS + 1);
-  let lastSigma = NaN;
-  let taps = 0;
+  // The reads for the current blur, paired and one per pixel, each kept
+  // until the blur changes.
+  const kernel = (fold: typeof pairTaps) => {
+    const offsets = new Float32Array(MAX_TAPS + 1);
+    const weights = new Float32Array(MAX_TAPS + 1);
+    let sigma = NaN;
+    let taps = 0;
+    return {
+      offsets,
+      weights,
+      get taps() {
+        return taps;
+      },
+      update(next: number) {
+        if (next === sigma) return;
+        sigma = next;
+        taps = fold(gaussianWeights(sigma), offsets, weights);
+      },
+    };
+  };
+  const paired = kernel(pairTaps);
+  const plain = kernel(plainTaps);
+  type Kernel = typeof paired;
 
   const pass = (
     input: SourceFrame,
     target: typeof horizontal,
     direction: [number, number],
     view: View,
+    { taps, offsets, weights }: Kernel,
   ) => {
     target.resize(view.bufferWidth, view.bufferHeight);
     target.bind();
@@ -152,20 +194,24 @@ export function createOptics(gl: WebGL2RenderingContext): Optics {
       // Film px -> device px.
       const sigma = (options.blur / filmScale) * view.pixelRatio;
       if (sigma < 0.3) return frame;
-
-      if (sigma !== lastSigma) {
-        lastSigma = sigma;
-        taps = pairTaps(gaussianWeights(sigma), offsets, weights);
-      }
+      paired.update(sigma);
 
       // Horizontal pass reads the source through its mapping; everything after
-      // is in screen space.
-      pass(frame, horizontal, [1, 0], view);
+      // is in screen space, 1:1 with the output. The source is taken to be too
+      // only when its mapping is the identity (see SourceFrame).
+      const identity =
+        frame.uvScale[0] === 1 &&
+        frame.uvScale[1] === 1 &&
+        frame.uvOffset[0] === 0 &&
+        frame.uvOffset[1] === 0;
+      if (!identity) plain.update(sigma);
+      pass(frame, horizontal, [1, 0], view, identity ? paired : plain);
       pass(
         { texture: horizontal.texture, uvScale: [1, 1], uvOffset: [0, 0] },
         vertical,
         [0, 1],
         view,
+        paired,
       );
       return { texture: vertical.texture, uvScale: [1, 1], uvOffset: [0, 0] };
     },

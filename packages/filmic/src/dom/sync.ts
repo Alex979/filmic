@@ -33,7 +33,10 @@ export interface AttachOptions {
    * Whether the ink boils. `true`: every footage frame. `false`: never (it
    * holds still). `"auto"` (default): it boils, watches what that costs,
    * and stops for good if it keeps dropping frames (see WINDOW_LATE).
-   * The state shows on the element as `data-filmic-boil`: "on" or "off".
+   * The decision belongs to the ink filters: once one "auto" attachment
+   * stops them, every "auto" attachment using them holds them still too
+   * (only a `true` one keeps boiling them). The state shows on the element
+   * as `data-filmic-boil`: "on" or "off".
    */
   boil?: boolean | "auto";
 }
@@ -61,31 +64,65 @@ const WINDOW = 24;
  * (12 of 24).
  */
 const WINDOW_LATE = 16;
-/** Longer gaps between frames, in ms, are stalls or a hidden page. */
-const PROBE_GAP = 250;
-/** Recent frames the median frame time is taken over: about 0.5 s at 60 Hz. */
-const RECENT = 31;
 /**
- * A frame is late when it takes this many times the median frame, so the
- * test works at any refresh rate. At 60 Hz a missed frame takes 2x, but on a
- * 120 Hz iPhone, where Safari holds animation frames to 60 Hz, it takes only
- * 1.5x (25 ms): the next 120 Hz refresh.
+ * Frames longer than this, in ms, are stalls. One inside a step's interval
+ * makes the step late, like any other long frame, but it's kept out of the
+ * baseline.
+ */
+const PROBE_GAP = 250;
+/** Frame times the baseline is the median of: about 0.5 s at 60 Hz. */
+const RECENT = 31;
+/** Frame times needed before their median replaces REFRESH as the baseline. */
+const RECENT_MIN = 3;
+/**
+ * Frames right after a boil step's frame that stay out of the baseline, since
+ * the step's cost can land there (see above). With more, a 30 Hz screen at
+ * 12 fps footage would have no frames left to measure.
+ */
+const STEP_TAIL = 1;
+/** The baseline until there are frames without a boil step to measure. */
+const REFRESH = 1000 / 60;
+/**
+ * A frame is late when it takes more than this many times the baseline: the
+ * median frame without a boil step (the screen's own rate), but at least
+ * REFRESH. The baseline leaves out frames with a boil step, since when
+ * footage runs at half the screen's rate or more those are most frames, and
+ * their median would be the boil's cost itself. The REFRESH floor keeps a
+ * real 120 Hz animation frame rate (Chrome or Firefox on a ProMotion screen)
+ * from calling a step late for missing one 120 Hz refresh when it would still
+ * have fit a 60 Hz frame. So a frame is late past 20.8 ms at 60 Hz or more:
+ * at 60 Hz a missed frame takes 33 ms, and on a 120 Hz iPhone, where Safari
+ * holds animation frames to 60 Hz, 25 ms (the next 120 Hz refresh). On a
+ * 30 Hz screen (e.g. low-power mode) the baseline is 33 ms, so it takes over
+ * 41 ms.
  */
 const LATE = 1.25;
 
 /**
+ * Inks that an "auto" attachment found too costly to boil. Other "auto"
+ * attachments leave them still, so a shared filter doesn't keep boiling
+ * through them.
+ */
+const stopped = new WeakSet<InkFilter>();
+
+/**
  * Watches what the ink's boil costs while `element` is on screen and calls
  * `decide` once, if the boil keeps making frames late. Per frame it does a
- * subtraction and a comparison; per boil step, a median of RECENT numbers.
- * Its rAF loop runs only while boil steps keep coming (`step`), and stops for
- * good once it decides.
+ * subtraction and a few comparisons; per boil step, a median of RECENT
+ * numbers. Its rAF loop runs only while boil steps keep coming (`step`), and
+ * stops for good once it decides.
  */
 function boilProbe(element: Element, decide: () => void) {
   let raf = 0;
   let last = -1; // the previous frame's timestamp; -1: none yet
-  let stepAt = -Infinity; // when the latest boil step was applied
+  // When the latest two boil steps were applied. With a step every frame
+  // and the film drawing before this loop's callback, the latest is already
+  // this frame's by the time the previous frame's step is looked for.
+  let stepAt = -Infinity;
+  let stepBefore = -Infinity;
+  let since = 0; // frames since the latest boil step's frame
   let inView = false;
-  // Recent frame times, for the median.
+  // Recent frame times without a boil step, for the baseline.
   const recent = new Float64Array(RECENT);
   const sorted = new Float64Array(RECENT);
   let recentCount = 0;
@@ -97,7 +134,8 @@ function boilProbe(element: Element, decide: () => void) {
   let steps = 0;
   let late = 0;
 
-  // Start over, so nothing is counted across a gap.
+  // Start over, so nothing is counted across a pause. The baseline is the
+  // screen's, so it's kept.
   const clear = () => {
     open = false;
     steps = late = 0;
@@ -108,22 +146,36 @@ function boilProbe(element: Element, decide: () => void) {
     clear();
   };
   // Off screen, the browser doesn't paint the ink, so its cost can't show.
-  const view = new IntersectionObserver(([entry]) => {
-    inView = entry.isIntersecting;
+  // Entries come oldest first: the last is the element's current state.
+  const view = new IntersectionObserver((entries) => {
+    inView = entries[entries.length - 1].isIntersecting;
     if (!inView) pause();
   });
   view.observe(element);
+  // A hidden page has no frames, and the first one back would look like a
+  // stall.
+  const visibility = () => {
+    if (document.hidden) pause();
+  };
+  document.addEventListener("visibilitychange", visibility);
   const stop = () => {
     pause();
     view.disconnect();
+    document.removeEventListener("visibilitychange", visibility);
   };
 
-  // A step's interval is over: judge it against the recent median.
+  // A step's interval is over: judge it against the baseline.
   const close = () => {
-    if (!open || recentCount < RECENT) return;
-    sorted.set(recent);
-    sorted.sort();
-    const isLate = longest > LATE * sorted[RECENT >> 1] ? 1 : 0;
+    if (!open) return;
+    let baseline = REFRESH;
+    const count = Math.min(recentCount, RECENT);
+    if (count >= RECENT_MIN) {
+      const values = sorted.subarray(0, count);
+      values.set(recent.subarray(0, count));
+      values.sort();
+      baseline = Math.max(values[count >> 1], REFRESH);
+    }
+    const isLate = longest > LATE * baseline ? 1 : 0;
     const slot = steps % WINDOW;
     if (steps >= WINDOW) late -= judged[slot];
     judged[slot] = isLate;
@@ -141,26 +193,35 @@ function boilProbe(element: Element, decide: () => void) {
     const previous = last;
     last = time;
     if (previous < 0) return;
-    if (gap > PROBE_GAP || document.hidden) return clear();
+    if (document.hidden) return pause();
     // A step applied during the previous frame starts a new interval with
     // this gap. Every callback in a frame gets the frame's start time, so
     // this holds whether the film drew before or after this loop.
-    if (stepAt >= previous && stepAt < time) {
+    if (
+      (stepAt >= previous && stepAt < time) ||
+      (stepBefore >= previous && stepBefore < time)
+    ) {
       close();
       if (!raf) return; // decided
       open = true;
       longest = 0;
-    }
-    longest = Math.max(longest, gap);
-    recent[recentCount++ % RECENT] = gap;
+      since = 0;
+    } else since++;
+    if (open) longest = Math.max(longest, gap);
+    if (since > STEP_TAIL && gap <= PROBE_GAP)
+      recent[recentCount++ % RECENT] = gap;
   };
 
   return {
     /** A boil step was just applied. */
     step() {
+      stepBefore = stepAt;
       stepAt = performance.now();
-      if (raf || !inView) return;
+      if (raf || !inView || document.hidden) return;
+      // The loop's first frame only takes its timestamp: the frame this step
+      // was applied in isn't measured, and the next one counts as its tail.
       last = -1;
+      since = 0;
       raf = requestAnimationFrame(frame);
     },
     /** Footage stopped: stop watching until the next step. */
@@ -192,24 +253,40 @@ export function attachElement(
   const style = element.style;
   const inks = options.ink ? [options.ink].flat() : [];
   const boil = options.boil ?? "auto";
-  let boiling = inks.length > 0 && boil !== false;
+  const auto = boil === "auto";
+  // An "auto" attachment leaves inks that another one stopped (see stopped).
+  const live = (ink: InkFilter) => !auto || !stopped.has(ink);
+  let boiling = boil !== false && inks.some(live);
   // The boil's state, where it's cheap to read (e.g. from a device's inspector).
   const show = (state: "on" | "off") => {
     element.dataset.filmicBoil = state;
   };
   let probe: ReturnType<typeof boilProbe> | null = null;
+  const stopBoiling = () => {
+    probe?.stop();
+    probe = null;
+    boiling = false;
+    show("off");
+  };
   if (inks.length) {
     show(boiling ? "on" : "off");
-    if (boil === "auto")
+    if (auto && boiling)
       probe = boilProbe(element, () => {
-        probe = null;
-        boiling = false;
-        show("off");
-        for (const ink of inks) ink.setFrame(0);
+        probe = null; // it has stopped itself
+        for (const ink of inks) {
+          stopped.add(ink);
+          ink.setFrame(0);
+        }
+        stopBoiling();
       });
   }
-  // The frame the element is posed for, and the shift that pose applied.
+  // The pose the element has, as the frame fields it came from (n < 0: none),
+  // and the shift it applied.
   let posed = -1;
+  let originX = 0;
+  let originY = 0;
+  let rotation = 0;
+  let brightness = 0;
   let dx = 0;
   let dy = 0;
   const reset = () => {
@@ -227,23 +304,44 @@ export function attachElement(
     if (!f.playing) return reset();
     // Draws between footage frames (e.g. on scroll) change nothing here, and
     // touching the styles anyway would make the browser redraw the element.
-    if (f.n === posed) return;
+    // New settings or a resize can change the pose within a footage frame.
+    if (
+      f.n === posed &&
+      f.origin[0] === originX &&
+      f.origin[1] === originY &&
+      f.dx === dx &&
+      f.dy === dy &&
+      f.rotation === rotation &&
+      f.brightness === brightness
+    )
+      return;
+    const newFrame = f.n !== posed;
     posed = f.n;
+    originX = f.origin[0];
+    originY = f.origin[1];
+    rotation = f.rotation;
+    brightness = f.brightness;
     // The rotation center is the film frame's, wherever the element sits.
     // The element's box includes the shift it was given last frame; the
     // rotation's effect on it is too small to matter.
     const c = canvas.getBoundingClientRect();
     const e = element.getBoundingClientRect();
-    const ox = c.left + f.origin[0] - (e.left - dx);
-    const oy = c.top + f.origin[1] - (e.top - dy);
+    const ox = c.left + originX - (e.left - dx);
+    const oy = c.top + originY - (e.top - dy);
     dx = f.dx;
     dy = f.dy;
     style.transformOrigin = `${ox.toFixed(2)}px ${oy.toFixed(2)}px`;
-    style.transform = `translate(${f.dx.toFixed(3)}px, ${f.dy.toFixed(3)}px) rotate(${f.rotation.toFixed(6)}rad)`;
-    style.filter = `brightness(${f.brightness.toFixed(4)})`;
-    if (!boiling) return;
-    for (const ink of inks) ink.setFrame(f.n);
-    probe?.step();
+    style.transform = `translate(${dx.toFixed(3)}px, ${dy.toFixed(3)}px) rotate(${rotation.toFixed(6)}rad)`;
+    style.filter = `brightness(${brightness.toFixed(4)})`;
+    if (!boiling || !newFrame) return;
+    let stepped = false;
+    for (const ink of inks) {
+      if (!live(ink)) continue;
+      ink.setFrame(f.n);
+      stepped = true;
+    }
+    if (stepped) probe?.step();
+    else stopBoiling(); // another attachment stopped all of them
   });
 
   return () => {

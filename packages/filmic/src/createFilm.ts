@@ -91,7 +91,10 @@ export interface Film {
    * rate while footage plays. Returns a function that stops syncing.
    */
   sync(element: Element): () => void;
-  /** Stop rendering and release GPU resources. */
+  /**
+   * Stop rendering, detach every attached or synced element, and release GPU
+   * resources.
+   */
   destroy(): void;
 }
 
@@ -145,6 +148,18 @@ export function createFilm(
     return () => {
       listeners.delete(listener);
     };
+  };
+  // Live attachments and syncs, by the function that undoes each: destroy()
+  // runs the ones still live, so none keeps watching (e.g. a boil probe's
+  // animation frames and observers).
+  const undos = new Set<() => void>();
+  const track = (undo: () => void) => {
+    const once = () => {
+      if (undos.delete(once)) undo();
+    };
+    undos.add(once);
+    render();
+    return once;
   };
 
   // Footage plays only while the canvas is on screen.
@@ -256,8 +271,9 @@ export function createFilm(
     cancelAnimationFrame(frame);
     draw();
   });
-  const visibility = new IntersectionObserver(([entry]) => {
-    onScreen = entry.isIntersecting;
+  // Entries come oldest first: the last is the canvas's current state.
+  const visibility = new IntersectionObserver((entries) => {
+    onScreen = entries[entries.length - 1].isIntersecting;
     updatePlayback();
     render();
   });
@@ -320,16 +336,16 @@ export function createFilm(
       return playing() ? frameStart(now, settings.footage.fps) : now;
     },
     attach(element, attachOptions) {
-      const detach = attachElement(element, canvas, subscribe, attachOptions);
-      render();
-      return detach;
+      if (destroyed) return () => {};
+      return track(attachElement(element, canvas, subscribe, attachOptions));
     },
     sync(element) {
-      const stop = syncAnimations(element, subscribe);
-      render();
-      return stop;
+      if (destroyed) return () => {};
+      return track(syncAnimations(element, subscribe));
     },
     destroy() {
+      if (destroyed) return;
+      for (const undo of [...undos]) undo();
       destroyed = true;
       cancelAnimationFrame(frame);
       cancelAnimationFrame(tick);
