@@ -1,6 +1,6 @@
 import { hexToRgb, type Hex } from "../core/color";
 import { fitRect, type Rect } from "../film/frame";
-import { shaderSource, type Source } from "../source";
+import { shaderSource, type Source, type SourceFrame } from "../source";
 
 /** Anything the browser can upload to a texture that filmic can film. */
 export type FilmableElement =
@@ -63,6 +63,7 @@ export function elementSource(
 
       let uploaded = false; // does the texture hold anything yet?
       let stale = true; // may the element have changed since the last upload?
+      let uploads = 0; // counts uploads, so a frame can tell if it's current
       let rect: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
       const upload = () => {
@@ -84,6 +85,7 @@ export function elementSource(
         gl.generateMipmap(gl.TEXTURE_2D);
         uploaded = true;
         stale = false;
+        uploads++;
       };
 
       // --- When to re-upload ---
@@ -146,6 +148,11 @@ void main() {
         },
       ).create(gl, context);
 
+      // The last frame, and what it was made from, so a still image doesn't
+      // get placed again on every draw (and the film knows it's unchanged).
+      let last: { key: string; frame: SourceFrame } | null = null;
+      let version = 0;
+
       return {
         render(view) {
           if (alwaysStale || stale || (video && !hasFrameCallback)) upload();
@@ -158,7 +165,22 @@ void main() {
               ? fitRect(view.width, view.height, w / h, fit, anchor)
               : { x: 0, y: 0, width: view.width, height: view.height };
 
-          return { ...place.render(view), rect };
+          const key = [
+            uploads,
+            view.bufferWidth,
+            view.bufferHeight,
+            view.width,
+            view.height,
+            rect.x,
+            rect.y,
+            rect.width,
+            rect.height,
+          ].join("|");
+          if (last?.key !== key) {
+            version++;
+            last = { key, frame: { ...place.render(view), rect, version } };
+          }
+          return last.frame;
         },
         dispose() {
           disposed = true;

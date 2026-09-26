@@ -1,3 +1,4 @@
+import { COLOR_GLSL } from "../core/color";
 import { createProgram, FULLSCREEN_VERT } from "../core/gl";
 import type { SourceFrame, View } from "../source";
 import { createDust, DUST_GLSL, type DustOptions } from "./dust";
@@ -20,6 +21,7 @@ import { createOptics, type OpticsOptions } from "./optics";
 import {
   createHalation,
   HALATION_GLSL,
+  type HaloFrame,
   type HalationOptions,
 } from "./halation";
 
@@ -55,6 +57,7 @@ uniform float uExposure;    // footage flicker, as a gain on sRGB values
 out vec4 fragColor;
 
 // Sample the source at a screen UV ((0, 0) bottom-left, (1, 1) top-right).
+// The source is linear light (see SourceFrame).
 vec3 sampleSource(vec2 uv) {
   return texture(uSource, uv * uUvScale + uUvOffset).rgb;
 }
@@ -64,6 +67,7 @@ vec2 filmToUv(vec2 d) {
   return d / uFilmScale * uPixelRatio / uBufferSize * vec2(1., -1.);
 }
 
+${COLOR_GLSL}
 ${HALATION_GLSL}
 ${GRAIN_GLSL}
 ${MOTTLE_GLSL}
@@ -88,8 +92,10 @@ void main() {
   // 1. Emulsion: sample the (already optically softened) image through
   //    grain-driven offsets, so edges break up into grain.
   vec3 c = sampleSource(onFilm + filmToUv(grainBreakup(filmPx)));
-  // 2. Halation: highlights glow through the film base.
-  c = applyHalation(c, onFilm);
+  // 2. Halation: highlights glow through the film base. Light adds in linear
+  //    light; from here on, values are sRGB, as they'll be shown (and as the
+  //    grain and mottle strengths were measured).
+  c = linearToSrgb(applyHalation(c, onFilm));
   // 3. Flicker: this frame's exposure.
   c *= uExposure;
   // 4. Mottle: faint, soft blotches of density and color.
@@ -128,6 +134,16 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
   const opticsPasses = createOptics(gl);
   const halation = createHalation(gl);
 
+  // The blurred picture and its halation depend only on the source's picture,
+  // the view and their settings, so they're kept from draw to draw while none
+  // of those change (e.g. footage frames over a still image).
+  let picture: {
+    key: string;
+    texture: WebGLTexture;
+    frame: SourceFrame;
+    halo: HaloFrame | null;
+  } | null = null;
+
   return {
     draw(
       sourceFrame,
@@ -148,8 +164,29 @@ export function createFilmPass(gl: WebGL2RenderingContext): FilmPass {
       // Passes that render into textures come first, before targeting the screen:
       // the optical blur, halation, dust, and regenerating noise if its
       // settings changed.
-      const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
-      const halo = halation.render(frame, view, halationOptions, film.scale);
+      const key =
+        sourceFrame.version === undefined
+          ? null
+          : [
+              sourceFrame.version,
+              sourceFrame.uvScale,
+              sourceFrame.uvOffset,
+              view.bufferWidth,
+              view.bufferHeight,
+              view.width,
+              view.height,
+              film.scale,
+              optics.blur,
+              halationOptions.amount,
+              halationOptions.threshold,
+              halationOptions.radius,
+            ].join("|");
+      if (!picture || key === null || key !== picture.key || picture.texture !== sourceFrame.texture) {
+        const frame = opticsPasses.apply(sourceFrame, view, optics, film.scale);
+        const halo = halation.render(frame, view, halationOptions, film.scale);
+        picture = { key: key ?? "", texture: sourceFrame.texture, frame, halo };
+      }
+      const { frame, halo } = picture;
       grainTexture.update(grain.seed, grain.softness, grain.sharpness);
       mottleTexture.update(mottle.seed);
       const dustTexture = dust.render(view, film, dustOptions, footage, current.n);

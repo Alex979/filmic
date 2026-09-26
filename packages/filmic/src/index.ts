@@ -40,6 +40,7 @@ export type {
   SourceFrame,
   View,
   SetUniforms,
+  ShaderSourceOptions,
 } from "./source";
 
 export { elementSource } from "./sources/elementSource";

@@ -1,0 +1,77 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: #0d0c0b;
+  color: #f2ede4;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  overflow-x: hidden; /* the attached page weaves a px past the edge */
+}
+
+/* The film, fixed behind the page. */
+#film {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The inked page: attached to the film, which takes over its transform and
+   filter, so the blocks inside carry the ink's filters. */
+#page {
+  position: relative;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 48px 16px 96px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.block {
+  margin: 0 0 1.25em;
+}
+
+/* Its own layer, so its filters are drawn once rather than with the page's
+   per-frame weave and flicker (`layers=1`). */
+.block.layer {
+  will-change: transform;
+}
+
+/* The inked element: a box of its own, so the ink applies to it as a whole. */
+.block > .ink {
+  display: block;
+}
+
+.block h2 {
+  margin: 1em 0 0.4em;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.block p {
+  margin: 0;
+}
+
+/* The active params: tiny, unfiltered, not attached to the film. */
+#params {
+  position: fixed;
+  left: 6px;
+  bottom: 6px;
+  z-index: 1;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgb(0 0 0 / 0.55);
+  color: #d8d2c8;
+  font: 10px/1.3 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+}

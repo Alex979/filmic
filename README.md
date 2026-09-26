@@ -144,14 +144,18 @@ void main() {
 
 The header provides `uResolution` (canvas size, CSS px), `uBufferSize` (device
 px), `uPixelRatio`, `filmPx()` (the pixel's position in CSS px, y down),
-`linearToSrgb()` and the `fragColor` output. For your own uniforms, pass a
-second argument:
+`linearToSrgb()`, `srgbToLinear()` and the `fragColor` output. For your own
+uniforms, pass a second argument:
 
 ```ts
 shaderSource(frag, (gl, uniforms, view) => {
   gl.uniform3f(uniforms.uSun, 0.7, 0.6, 0.1);
 });
 ```
+
+A shader that works in linear light (like the one above) can skip the
+conversion and write linear light to `fragColor`, with a third argument:
+`shaderSource(frag, setUniforms, { linear: true })`.
 
 For anything else, implement the `Source` interface yourself: see
 [docs/api.md](docs/api.md#custom-sources).
@@ -178,8 +182,9 @@ gives them the same look:
   gets film's warm glow, to match the canvas's: `ink.glow` goes on the
   element around the inked one.
 - **`film.attach(element)`** moves an element with the film each frame (weave
-  and flicker) and makes its ink boil. It takes over the element's `transform`
-  and `filter`, so attach a wrapper around your content.
+  and flicker) and makes its ink boil, while the page can afford it. It takes
+  over the element's `transform` and `filter`, so attach a wrapper around your
+  content.
 - **`film.sync(element)`** steps the element's CSS animations and transitions
   at the footage frame rate, in lockstep with the film. Anything you don't sync
   keeps animating smoothly.

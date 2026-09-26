@@ -422,6 +422,10 @@ export function createDust(gl: WebGL2RenderingContext): Dust {
 
   let key = "";
   let count = 0;
+  // What the texture currently shows: the layout, and where and how big it
+  // was drawn. Redrawn only when that changes (a new footage frame, a resize),
+  // not on every draw between.
+  let drawn = "";
 
   return {
     render(view, frame, options, footage, n) {
@@ -441,14 +445,31 @@ export function createDust(gl: WebGL2RenderingContext): Dust {
         gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
       }
 
+      const { x, y, width, height } = frame.rect;
+      const visible = count > 0 && options.amount > 0;
+      const d = [
+        key,
+        visible,
+        view.bufferWidth,
+        view.bufferHeight,
+        view.width,
+        view.height,
+        x,
+        y,
+        width,
+        height,
+        frame.scale,
+      ].join("|");
+      if (d === drawn) return target.texture;
+      drawn = d;
+
       target.resize(view.bufferWidth, view.bufferHeight);
       target.bind();
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
-      if (!count || options.amount <= 0) return target.texture;
+      if (!visible) return target.texture;
 
       gl.useProgram(program);
-      const { x, y, width, height } = frame.rect;
       gl.uniform4f(u.uFrame, x, y, width, height);
       gl.uniform1f(u.uFilmScale, frame.scale);
       gl.uniform2f(u.uView, view.width, view.height);

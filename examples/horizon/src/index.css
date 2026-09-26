@@ -74,6 +74,9 @@ body {
   right: 0;
   overflow: hidden; /* keeps the glow's area to the strip; the glow itself extends past it */
   pointer-events: none;
+  /* Its own layer, so its filters are drawn once: sharing a layer with
+     what changes each frame redraws them with it (see .subtitle too). */
+  will-change: transform;
 }
 
 /* The title overlay: fills the strip, SVG units = CSS px. */
@@ -106,6 +109,7 @@ body {
   text-align: center;
   color: var(--light);
   opacity: 0.82;
+  will-change: transform; /* its own layer (see .title-glow) */
 }
 
 .overlay .title {

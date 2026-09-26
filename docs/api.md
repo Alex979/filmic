@@ -45,7 +45,7 @@ Throws if WebGL 2 isn't available.
 | `frameTime(now?)`               | `now` (default `performance.now()`) stepped to the start of its footage frame while footage plays; else `now`. |
 | `attach(element, options?)`     | Move an element with the film. Returns a detach function. See [attach](#filmattach).                         |
 | `sync(element)`                 | Step an element's CSS animations at the footage rate. Returns a stop function. See [sync](#filmsync).        |
-| `destroy()`                     | Stop drawing and free GPU resources. The canvas can be handed to `createFilm` again.                          |
+| `destroy()`                     | Stop drawing, detach everything attached or synced, and free GPU resources. The canvas can be handed to `createFilm` again. |
 
 ## Settings
 
@@ -200,7 +200,7 @@ footage frame rate.
 ### shaderSource
 
 ```ts
-shaderSource(frag: string, setUniforms?: SetUniforms): Source
+shaderSource(frag: string, setUniforms?: SetUniforms, options?: { linear?: boolean }): Source
 ```
 
 A fragment shader that draws the scene. filmic prepends a header, so `frag`
@@ -213,12 +213,22 @@ provides:
 | `uBufferSize`            | `vec2`: drawing buffer size, device px.                  |
 | `uPixelRatio`            | `float`: device px per CSS px.                           |
 | `filmPx()`               | The current pixel in CSS px, origin top-left, y down.    |
-| `linearToSrgb(vec3)`     | Linear light to sRGB, for output.                        |
+| `linearToSrgb(vec3)`     | Linear light to sRGB.                                    |
+| `srgbToLinear(vec3)`     | sRGB to linear light.                                    |
 | `fragColor`              | The output: write an sRGB color.                         |
 
 `setUniforms(gl, uniforms, view)` runs before every draw: `uniforms` maps names
 to locations (array uniforms without `[0]`), `view` is the canvas size (see
 `View`).
+
+With `linear: true`, `fragColor` takes linear light instead of sRGB, which
+saves a conversion in shaders that work in linear light anyway.
+
+Reserved names: the header defines `srgbToLinear()` and `linearToSrgb()`, and
+renames the shader's `main` with `#define main filmicSourceMain` so it can run
+it and convert what it wrote. So `frag` must not define `srgbToLinear` or
+`linearToSrgb` itself, and must not use `main` as a name for anything but its
+entry point (a variable, a field or a macro).
 
 ### testPattern
 
@@ -244,16 +254,37 @@ interface SourceInstance {
 }
 
 interface SourceFrame {
-  texture: WebGLTexture;
+  texture: WebGLTexture; // linear light: an sRGB-format texture, or linear values
   uvScale: [number, number]; // the film pass samples at screenUv * uvScale + uvOffset
   uvOffset: [number, number]; // (screen UV: (0, 0) bottom-left)
   rect?: Rect; // where the picture sits on the canvas, for frame.fit "source"
+  version?: number; // changes when the texture's contents change
 }
 ```
 
 `context.requestRender()` asks for a redraw (e.g. when new content arrives).
 A texture rendered at canvas size uses scale `[1, 1]` and offset `[0, 0]`; an
 uploaded image, whose first row is its top, uses `[1, -1]` and `[0, 1]`.
+
+A texture with that identity mapping (scale `[1, 1]`, offset `[0, 0]`) is
+expected to be the view's buffer size (`view.bufferWidth` by
+`view.bufferHeight`): the optical blur then reads it two pixels at a time.
+With any other mapping it reads every pixel on its own, which is exact at any
+size but takes twice the reads in its first pass.
+
+The film reads the texture as linear light. An `SRGB8_ALPHA8` texture (what
+filmic's own sources render into) is decoded by the GPU as it's read, so it
+works as is; any other format must hold linear values.
+
+This is a change: sources used to hand the film sRGB values. A custom source
+that returns plain `RGBA8` (not sRGB-format) textures holding sRGB pixels now
+renders too dark. Upload or render into an sRGB-format texture
+(`SRGB8_ALPHA8`), or write linear values.
+
+`version` lets the film skip work: while the same texture comes back with the
+same `version` (and the canvas hasn't resized), the optical blur and halation
+aren't recomputed, only the effects that change every frame. Bump it whenever
+the contents change, or leave it out for a texture that changes every render.
 
 ## DOM
 
@@ -278,6 +309,7 @@ from CSS before it exists.
 | `halation`       | `0`         | Halation: a warm glow around light ink, on the canvas's scale.    |
 | `halationRadius` | `14`        | How far the glow reaches, in CSS px.                              |
 | `halationColor`  | `"#ff6230"` | Color of the glow.                                                |
+| `halationTail`   | `"auto"`    | Its widest layer: `true`, `false` or `"auto"` (see below).        |
 
 The halation glow goes on the element *around* the inked one, not on it:
 
@@ -294,9 +326,21 @@ layers, and Safari clips them when they share an element with the SVG filter,
 and ignores them on SVG elements, so SVG text takes its glow from an HTML
 parent. The glowing element can animate `opacity` and `transform` freely.
 
+The glow's widest layer, its tail, costs the most to paint: the CPU blurs it,
+at a cost of about the square of its radius in device pixels. On a 3x phone
+screen it's most of the glow's cost, and it barely shows at that density, so
+`"auto"` leaves it out at 2.5 or more device pixels per CSS px (and follows
+the screen as that changes). `true` or `false` keeps it or drops it anywhere.
+
 The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 `setFrame(n)` (shift the noise for footage frame `n`; `attach` does this) and
 `destroy()`.
+
+While the ink holds still (frame `0`), the filter tiles its noise from an image
+rendered once per `seed` and screen pixel ratio, which Safari paints in about a
+third of the time live noise takes. A boiling ink (`setFrame` with a nonzero frame)
+computes the noise live on every frame, so `attach` only keeps it boiling
+where the page can afford it (see [`boil`](#filmattach)).
 
 Sizes are in CSS px, so small text looks softer than large text; lower
 `softness` for body copy. Browsers skip filters on zero-size elements: keep
@@ -307,7 +351,7 @@ emptiable editable elements from collapsing (e.g. with padding).
 ```ts
 film.attach(
   element: HTMLElement | SVGElement,
-  options?: { ink?: InkFilter | InkFilter[] },
+  options?: { ink?: InkFilter | InkFilter[]; boil?: boolean | "auto" },
 ): () => void
 ```
 
@@ -316,6 +360,36 @@ about the film frame's center), `filter` (the flicker, as `brightness()`),
 and, with `ink` (one filter or several), advances the ink's noise. It takes over `transform`,
 `transform-origin` and `filter`, so attach a wrapper, not the styled element
 itself. The returned function detaches it and clears those styles.
+
+| Option | Default  | Description                                                                  |
+| ------ | -------- | ---------------------------------------------------------------------------- |
+| `ink`  | none     | Ink filters used inside the element, whose noise boils each footage frame.  |
+| `boil` | `"auto"` | Whether the ink boils: `true`, `false` (it holds still) or `"auto"` (below). |
+
+Boiling redraws the ink's filters every footage frame, and Safari paints SVG
+filters on the CPU. Whether that fits in a frame depends on the device and the
+page: on an iPhone a boiling title can make every boil step a dropped frame,
+while desktop Safari drops about one in six and a page of boiling paragraphs
+costs nothing measurable on either. So with `"auto"` the ink boils from the
+start while `attach` watches the screen's frames (only while footage plays and
+the element is on screen). A boil step counts as late if any frame before the
+next step took over 1.25x the screen's usual frame (the median frame without a
+boil step, and at least 1/60 s, so over 20.8 ms at 60 Hz or faster). Once 16 of
+the last 24 steps (2 s at 12 fps) were late, the ink stops boiling and holds
+still for good; weave and flicker carry on. On phones this usually turns the
+boil off within about 2 s of it showing; on desktops it usually keeps boiling,
+and a brief stutter doesn't stop it. Its watching is a few arithmetic
+operations per frame, which stop once it turns the boil off. `true` and
+`false` don't watch.
+
+The decision is the ink filter's, for as long as the page lives: once an
+`"auto"` attachment stops an ink, every `"auto"` attachment that uses it
+leaves it still (so a filter shared between elements doesn't keep boiling
+through another one), and one whose inks are all stopped shows `"off"`. An
+attachment with `boil: true` still boils it.
+
+With `ink`, the element's `data-filmic-boil` attribute shows the boil's state:
+`"on"` or `"off"`.
 
 ### film.sync
 

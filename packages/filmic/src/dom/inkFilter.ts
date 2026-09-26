@@ -15,11 +15,18 @@ import { hexToRgb, type Hex } from "../core/color";
  *   4. another channel of the same noise, thresholded, punches pinholes
  *      through the ink
  *
- * The noise is one feTurbulence with one octave. It's recomputed every time
- * the ink boils, and Safari computes it pixel by pixel on the CPU, so it's
- * the filter's main cost on phones. Two octaves or a second turbulence cost
- * several times as much for detail too fine to see; their strength is made
- * up for below.
+ * The noise is one feTurbulence with one octave. Safari computes it pixel by
+ * pixel on the CPU every time it paints the filter (an inked element
+ * scrolling into view, a redraw), so it's the filter's main cost on phones.
+ * Two octaves or a second turbulence cost several times as much for detail
+ * too fine to see; their strength is made up for below.
+ *
+ * So while the ink holds still, the filter doesn't compute the noise: it
+ * tiles an image of it, rendered once (the same turbulence, made to tile
+ * seamlessly), which cut the paint time of a page of inked text to about a
+ * third on an iPhone. Until that image is ready, and while the ink boils
+ * (`setFrame`, a new pattern every footage frame), the filter computes the
+ * noise live instead.
  *
  * Halation, the warm glow film gives bright highlights, is separate: CSS
  * drop-shadow() glows (`ink.glow`) for the element *around* the inked one,
@@ -58,6 +65,13 @@ export interface InkOptions {
   halationRadius: number;
   /** Color of the glow, "#rrggbb". */
   halationColor: Hex;
+  /**
+   * The glow's widest layer, its long tail. "auto" leaves it out on screens
+   * with 2.5 or more device pixels per CSS px: a blur costs the CPU about the
+   * square of its radius in device pixels, so at 3x the tail is most of the
+   * glow's paint cost, while at that density it barely shows.
+   */
+  halationTail: boolean | "auto";
 }
 
 /** Defaults: a subtle printed look for display-size text. */
@@ -70,6 +84,7 @@ export const DEFAULT_INK: InkOptions = {
   halation: 0,
   halationRadius: 14,
   halationColor: "#ff6230",
+  halationTail: "auto",
 };
 
 export interface InkFilter {
@@ -104,12 +119,97 @@ export interface InkFilter {
 
 const SVG = "http://www.w3.org/2000/svg";
 
+const FREQUENCY = 0.9;
+// The noise tile's size, in CSS px. A whole number of noise periods fits
+// across it (250 * 0.9 = 225), so tiling it seamlessly doesn't need to nudge
+// the frequency.
+const TILE = 250;
+// Device pixels per CSS px from which an "auto" halation tail is left out.
+const TAIL_RATIO = 2.5;
+
 // One octave of noise varies less than the two the look was tuned with; these
 // scale it back up (measured spreads: edges 0.117 / 0.104, pinholes, which
 // used their own noise at 0.75, 0.122 / 0.104).
 const EDGE_GAIN = 1.118;
 const HOLE_GAIN = 1.17;
 let count = 0;
+
+// Noise tiles, shared by every filter with the same seed and pixel ratio, as
+// object URLs of PNGs.
+interface Tile {
+  key: string;
+  url: Promise<string>;
+  users: number;
+}
+const tiles = new Map<string, Tile>();
+
+const tileKey = (seed: number, ratio: number) => `${seed}@${ratio}`;
+
+function holdTile(seed: number, ratio: number): Tile {
+  const key = tileKey(seed, ratio);
+  let tile = tiles.get(key);
+  if (!tile) {
+    const made: Tile = { key, url: renderTile(seed, ratio), users: 0 };
+    // A failed render isn't kept, so the next filter to ask tries again.
+    made.url.catch(() => {
+      if (tiles.get(key) === made) tiles.delete(key);
+    });
+    tiles.set(key, made);
+    tile = made;
+  }
+  tile.users++;
+  return tile;
+}
+
+function releaseTile(tile: Tile) {
+  if (--tile.users > 0) return;
+  if (tiles.get(tile.key) === tile) tiles.delete(tile.key);
+  tile.url.then(URL.revokeObjectURL, () => {});
+}
+
+const load = (src: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = src;
+  });
+
+/**
+ * Render the ink's noise for `seed` into a PNG, TILE CSS px square at `ratio`
+ * device pixels per CSS px, and resolve with its object URL.
+ *
+ * A canvas stores colors premultiplied by alpha, which would wear away the
+ * noise's R and G wherever its alpha is low. The ink doesn't use B, so the
+ * tile carries the noise's alpha in B and is opaque; the filter moves it back.
+ */
+async function renderTile(seed: number, ratio: number): Promise<string> {
+  const size = Math.max(1, Math.round(TILE * ratio));
+  const svg =
+    `<svg xmlns="${SVG}" width="${size}" height="${size}" viewBox="0 0 ${TILE} ${TILE}" preserveAspectRatio="none">` +
+    `<filter id="t" filterUnits="userSpaceOnUse" x="0" y="0" width="${TILE}" height="${TILE}" color-interpolation-filters="sRGB">` +
+    `<feTurbulence type="fractalNoise" baseFrequency="${FREQUENCY}" numOctaves="1" seed="${seed}" stitchTiles="stitch"/>` +
+    `<feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 0 1 0  0 0 0 0 1"/>` +
+    `</filter><rect width="${TILE}" height="${TILE}" filter="url(#t)"/></svg>`;
+  const image = await load(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("no 2d canvas");
+  context.drawImage(image, 0, 0, size, size);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve));
+  if (!blob) throw new Error("tile not encoded");
+  const url = URL.createObjectURL(blob);
+  // Decode it before the filter uses it, so the switch doesn't paint a frame
+  // with the image still loading (and no noise).
+  try {
+    await load(url);
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+  return url;
+}
 
 /**
  * Create an ink filter and add it to the page (in a hidden <svg>). Any number
@@ -126,7 +226,7 @@ export function inkFilter(
   const el = <K extends keyof SVGElementTagNameMap>(
     tag: K,
     attrs: Record<string, string | number>,
-    parent: Element,
+    parent: Node,
   ) => {
     const node = document.createElementNS(SVG, tag);
     for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, String(v));
@@ -148,10 +248,31 @@ export function inkFilter(
     { id, x: "-4%", y: "-15%", width: "108%", height: "130%", "color-interpolation-filters": "sRGB" },
     el("defs", {}, svg),
   );
-  const noise = el(
+  // The noise, "n": computed live, or tiled from an image of it (see above).
+  // Only one of the two is in the filter at a time.
+  const turbulence = el(
     "feTurbulence",
-    { type: "fractalNoise", baseFrequency: 0.9, numOctaves: 1, result: "n" },
+    { type: "fractalNoise", baseFrequency: FREQUENCY, numOctaves: 1, result: "n" },
     filter,
+  );
+  // The image is placed with only a width and height: its x and y default to
+  // the filter region's, so the tile starts at the region's corner wherever
+  // the element is in its user space. At a fixed x and y it could miss the
+  // region (an SVG element far from its origin), and Safari then drops the
+  // element altogether. The corner is where every copy of the tile starts,
+  // so whatever part of the tile the browser renders is the part that shows.
+  const tiled = document.createDocumentFragment();
+  const image = el(
+    "feImage",
+    { width: TILE, height: TILE, preserveAspectRatio: "none", result: "tile" },
+    tiled,
+  );
+  const tile = el("feTile", { in: "tile", result: "tiled" }, tiled);
+  // Alpha back out of B, where the tile keeps it (see renderTile).
+  const unpack = el(
+    "feColorMatrix",
+    { in: "tiled", type: "matrix", values: "1 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 1 0 0", result: "n" },
+    tiled,
   );
   const displace = el(
     "feDisplacementMap",
@@ -169,10 +290,84 @@ export function inkFilter(
   const holes = el("feColorMatrix", { in: "n", type: "matrix", result: "holes" }, filter);
   el("feComposite", { in: "ink", in2: "holes", operator: "in" }, filter);
 
+  // The tile this filter holds, and whether it's ready to use. A tile that
+  // failed to render stays held, unready, so the filter computes the noise
+  // live and tries again only once the seed or pixel ratio changes.
+  let held: Tile | null = null;
+  let ready = false;
+  let ticket = 0;
+  let wired = false;
+  let destroyed = false;
+
+  // Swap the noise's source in the filter.
+  const wire = (fromImage: boolean) => {
+    if (fromImage === wired) return;
+    wired = fromImage;
+    if (fromImage) turbulence.replaceWith(image, tile, unpack);
+    else {
+      image.before(turbulence);
+      tiled.append(image, tile, unpack);
+    }
+  };
+
+  // Tiles the noise from an image while the ink holds still and the image
+  // for its seed and the screen's pixel ratio is ready; otherwise computes it
+  // live. A new image is rendered only when the seed or pixel ratio changes,
+  // and not while the ink boils.
+  const route = () => {
+    if (destroyed) return;
+    const seed = 4 + Math.max(0, Math.floor(current.seed));
+    const ratio = window.devicePixelRatio || 1;
+    const key = tileKey(seed, ratio);
+    if (frame === 0 && key !== held?.key) {
+      wire(false);
+      if (held) releaseTile(held);
+      held = holdTile(seed, ratio);
+      ready = false;
+      const mine = ++ticket;
+      held.url.then(
+        (url) => {
+          if (mine !== ticket) return;
+          image.setAttribute("href", url);
+          ready = true;
+          route();
+        },
+        () => {}, // live noise it is (see held)
+      );
+    }
+    wire(frame === 0 && ready && key === held?.key);
+  };
+
+  // Watch for the pixel ratio changing (a zoom, a move to another screen):
+  // it changes the noise tile, and the glow when its tail is "auto".
+  let media: MediaQueryList | null = null;
+  const watch = () => {
+    media?.removeEventListener("change", rewatch);
+    media = null;
+    if (typeof window.matchMedia !== "function") return;
+    media = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    media.addEventListener("change", rewatch);
+  };
+  const rewatch = () => {
+    watch();
+    route();
+    publish();
+  };
+
+  // The live noise's seed, the one attribute that changes every boil step.
+  // The turbulence keeps it while it's out of the filter (tiling), so it's
+  // right whenever it's wired back in.
+  let seeded = "";
+  const applySeed = () => {
+    const seed = String(4 + Math.max(0, Math.floor(current.seed)) + (frame % 997));
+    if (seed === seeded) return;
+    seeded = seed;
+    turbulence.setAttribute("seed", seed);
+  };
+  // Everything else, which only set() changes.
   const apply = () => {
     const o = current;
-    const seed = Math.max(0, Math.floor(o.seed)) + (frame % 997);
-    noise.setAttribute("seed", String(4 + seed));
+    applySeed();
     displace.setAttribute("scale", String(o.roughness * EDGE_GAIN));
     blur.setAttribute("stdDeviation", String(o.softness));
     firm.setAttribute("slope", String(o.firmness));
@@ -188,7 +383,8 @@ export function inkFilter(
   // the ones before it. CSS blends glows in sRGB, where a faint tail looks
   // much dimmer than the same light blended in linear (as the canvas does),
   // so it takes three layers to get film's long, luminous falloff. The rim is
-  // a little lighter, like the hot edge of real halation.
+  // a little lighter, like the hot edge of real halation. The tail is the
+  // costly one, and optional (`halationTail`).
   const glow = (o: InkOptions) => {
     if (o.halation <= 0 || o.halationRadius <= 0) return "";
     const rgb = hexToRgb(o.halationColor);
@@ -198,22 +394,31 @@ export function inkFilter(
       // CSS blur lengths are two standard deviations.
       return `drop-shadow(0 0 ${(blur * o.halationRadius).toFixed(2)}px rgb(${r} ${g} ${b} / ${a}))`;
     };
-    return [shadow(0.21, 0.45, 0.1), shadow(0.71, 0.5), shadow(2, 0.45)].join(" ");
+    const layers = [shadow(0.21, 0.45, 0.1), shadow(0.71, 0.5)];
+    const tail =
+      o.halationTail === "auto" ? (window.devicePixelRatio || 1) < TAIL_RATIO : o.halationTail;
+    if (tail) layers.push(shadow(2, 0.45));
+    return layers.join(" ");
   };
   // With no glow the property still holds a filter that does nothing, so a
   // filter list that includes var(--id-glow) stays valid. Any id makes a
   // property name, but in var() it has to be escaped (React's useId() ids,
   // like ":r1:", aren't CSS identifiers).
+  // Written only when it changes: every element using it restyles.
   const property = `--${id}-glow`;
-  const publish = () =>
-    document.documentElement.style.setProperty(
-      property,
-      glow(current) || "opacity(1)",
-    );
+  let published = "";
+  const publish = () => {
+    const value = glow(current) || "opacity(1)";
+    if (value === published) return;
+    published = value;
+    document.documentElement.style.setProperty(property, value);
+  };
 
   apply();
   publish();
   document.body.appendChild(svg);
+  watch();
+  route();
 
   return {
     id,
@@ -225,15 +430,22 @@ export function inkFilter(
     set(options) {
       current = { ...current, ...options };
       apply();
+      route();
       publish();
     },
     setFrame(n) {
       const next = Math.max(0, Math.floor(n));
       if (next === frame) return;
       frame = next;
-      apply();
+      applySeed();
+      route();
     },
     destroy() {
+      destroyed = true;
+      ticket++;
+      media?.removeEventListener("change", rewatch);
+      if (held) releaseTile(held);
+      held = null;
       svg.remove();
       document.documentElement.style.removeProperty(property);
     },

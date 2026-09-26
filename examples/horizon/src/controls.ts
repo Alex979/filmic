@@ -20,8 +20,8 @@ interface TitleControls {
   text: string;
   setText(text: string): void;
   setPlain(plain: boolean): void;
-  /** Boil the ink's noise every footage frame. */
-  setBoil(on: boolean): void;
+  /** Boil the ink's noise every footage frame: always, never, or "auto". */
+  setBoil(boil: boolean | "auto"): void;
   /** Play the intro again. */
   replay(): void;
   /** The blob's frame rate while the footage plays, and its default. */
@@ -198,16 +198,19 @@ export function createControls(film: Film, title: TitleControls): GUI {
 
   // --- Footage ---
   const footage = { ...s.footage };
-  const boil = { on: true };
+  // Boiling ink costs a redraw of its filters every frame, so by default
+  // attach keeps it only where that doesn't drop frames ("auto").
+  const boilModes = { auto: "auto", on: true, off: false } as const;
+  const boil = { mode: "auto" as keyof typeof boilModes };
   const applyFootage = () => film.set({ footage });
   const fo = gui.addFolder("Footage");
   fo.add(footage, "enabled").name("animated").onChange(applyFootage);
   fo.add(footage, "fps", 1, 60, 1).name("frame rate (fps)").onChange(applyFootage);
   fo.add(title, "blobFps", 1, 60, 1).name("blob frame rate (fps)");
   fo.add(footage, "grain").name("new grain every frame").onChange(applyFootage);
-  fo.add(boil, "on")
+  fo.add(boil, "mode", Object.keys(boilModes))
     .name("boil title ink")
-    .onChange((on: boolean) => title.setBoil(on));
+    .onChange((mode: keyof typeof boilModes) => title.setBoil(boilModes[mode]));
   fo.add(footage, "weave", 0, 4, 0.01).name("weave (film px)").onChange(applyFootage);
   fo.add(footage, "weaveRotation", 0, 0.2, 0.001)
     .name("weave rotation (deg)")
@@ -247,8 +250,8 @@ export function createControls(film: Film, title: TitleControls): GUI {
           // This example plays as footage by default.
           Object.assign(footage, DEFAULT_FOOTAGE, { enabled: true });
           title.blobFps = title.defaultBlobFps;
-          boil.on = true;
-          title.setBoil(true);
+          boil.mode = "auto";
+          title.setBoil("auto");
           applyFootage();
           refresh(gui);
           applyFrame();

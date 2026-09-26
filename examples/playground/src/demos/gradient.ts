@@ -3,10 +3,12 @@ import type { DemoInstance } from "./types";
 
 /**
  * A procedural shaderSource written inline: a low sun in a hazy dusk sky.
- * It's drawn from the canvas size, so it fills any card at any size.
+ * It's drawn from the canvas size, so it fills any card at any size. It
+ * works in linear light throughout, so it hands that over as is.
  */
 const dusk = () =>
-  shaderSource(/* glsl */ `
+  shaderSource(
+    /* glsl */ `
 void main() {
   vec2 uv = filmPx() / uResolution;           // 0..1, y down
   vec2 sun = vec2(.68, .62);
@@ -25,8 +27,11 @@ void main() {
   // Dark ground below the horizon line.
   c = mix(c, vec3(.012, .01, .012), smoothstep(.785, .79, uv.y));
 
-  fragColor = vec4(linearToSrgb(c), 1.);
-}`);
+  fragColor = vec4(c, 1.);
+}`,
+    undefined,
+    { linear: true },
+  );
 
 /** A procedural shader source: fills whatever canvas it's given. */
 export function gradientDemo(): DemoInstance {
