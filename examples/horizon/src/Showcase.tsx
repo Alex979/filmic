@@ -107,10 +107,12 @@ export function Showcase() {
     const boiling = [inks.title, inks.subtitle];
 
     // The title and subheading sit above the canvas, in a layer that moves
-    // with the film: its weave, its flicker, and ink that boils every frame.
-    // Its CSS animations (the subheading's) step at the footage frame rate.
+    // with the film: its weave and its flicker. Its ink holds still; it can
+    // boil every frame (see the panel), but Safari then reruns its filters on
+    // the CPU each frame. Its CSS animations (the subheading's) step at the
+    // footage frame rate.
     const layer = layerRef.current!;
-    let detach = film.attach(layer, { ink: boiling });
+    let detach = film.attach(layer);
     const unsync = film.sync(layer);
 
     // --- Input: at the screen's rate ---

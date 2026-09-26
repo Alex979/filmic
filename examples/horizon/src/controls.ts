@@ -198,7 +198,8 @@ export function createControls(film: Film, title: TitleControls): GUI {
 
   // --- Footage ---
   const footage = { ...s.footage };
-  const boil = { on: true };
+  // Off by default: boiling ink costs a redraw of its filters every frame.
+  const boil = { on: false };
   const applyFootage = () => film.set({ footage });
   const fo = gui.addFolder("Footage");
   fo.add(footage, "enabled").name("animated").onChange(applyFootage);
@@ -247,8 +248,8 @@ export function createControls(film: Film, title: TitleControls): GUI {
           // This example plays as footage by default.
           Object.assign(footage, DEFAULT_FOOTAGE, { enabled: true });
           title.blobFps = title.defaultBlobFps;
-          boil.on = true;
-          title.setBoil(true);
+          boil.on = false;
+          title.setBoil(false);
           applyFootage();
           refresh(gui);
           applyFrame();
