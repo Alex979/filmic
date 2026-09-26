@@ -35,7 +35,8 @@ one hero. No effect should need a "use sparingly" warning. So:
   Safari. Changing anything they depend on (an attribute, a seed, a style of
   the element or its content) redraws them, and on a phone each redraw can
   cost a dropped frame. As static decoration they're fine. The ink's live boil
-  (`film.attach(el, { ink })`) breaks this rule, so it's off in the examples.
+  (`film.attach(el, { ink })`) breaks this rule, so by default (`boil:
+  "auto"`) it watches what it costs and stops if it keeps dropping frames.
 - **Give filtered elements their own small layer** (`will-change: transform`
   on the filtered element or a tight wrapper). Sharing a layer with anything
   that changes each frame repaints the filters with it. Keep these layers

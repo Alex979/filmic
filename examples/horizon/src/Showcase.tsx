@@ -107,12 +107,13 @@ export function Showcase() {
     const boiling = [inks.title, inks.subtitle];
 
     // The title and subheading sit above the canvas, in a layer that moves
-    // with the film: its weave and its flicker. Its ink holds still; it can
-    // boil every frame (see the panel), but Safari then reruns its filters on
-    // the CPU each frame. Its CSS animations (the subheading's) step at the
-    // footage frame rate.
+    // with the film: its weave and its flicker. Its ink boils each footage
+    // frame, but Safari reruns its filters on the CPU each time, which on a
+    // phone drops frames; so attach watches that and, if it keeps happening,
+    // holds the ink still for good ("auto", the default; see the panel). Its CSS
+    // animations (the subheading's) step at the footage frame rate.
     const layer = layerRef.current!;
-    let detach = film.attach(layer);
+    let detach = film.attach(layer, { ink: boiling });
     const unsync = film.sync(layer);
 
     // --- Input: at the screen's rate ---
@@ -355,9 +356,9 @@ export function Showcase() {
       text: TITLE,
       setText,
       setPlain,
-      setBoil(on) {
+      setBoil(boil) {
         detach();
-        detach = film.attach(layer, on ? { ink: boiling } : {});
+        detach = film.attach(layer, { ink: boiling, boil });
       },
       replay() {
         scroller.scrollTo(0, 0);

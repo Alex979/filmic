@@ -182,8 +182,9 @@ gives them the same look:
   gets film's warm glow, to match the canvas's: `ink.glow` goes on the
   element around the inked one.
 - **`film.attach(element)`** moves an element with the film each frame (weave
-  and flicker) and makes its ink boil. It takes over the element's `transform`
-  and `filter`, so attach a wrapper around your content.
+  and flicker) and makes its ink boil, while the page can afford it. It takes
+  over the element's `transform` and `filter`, so attach a wrapper around your
+  content.
 - **`film.sync(element)`** steps the element's CSS animations and transitions
   at the footage frame rate, in lockstep with the film. Anything you don't sync
   keeps animating smoothly.

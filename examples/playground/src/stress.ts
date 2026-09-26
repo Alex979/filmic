@@ -130,7 +130,7 @@ async function main() {
   // The page moves with the film (weave and flicker). With `boil`, the ink's
   // noise also changes each footage frame, which redraws every block's
   // filters; without it the ink holds still.
-  if (params.boil && ink) film.attach(page, { ink });
+  if (params.boil && ink) film.attach(page, { ink, boil: true });
   else film.attach(page);
 
   window.stress = { film, ready: true, params };

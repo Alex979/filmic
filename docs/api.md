@@ -322,7 +322,8 @@ The returned `InkFilter` has `id`, `url`, `glow`, `options`, `set(options)`,
 While the ink holds still (frame `0`), the filter tiles its noise from an image
 rendered once per `seed` and screen pixel ratio, which Safari paints in about a
 third of the time live noise takes. A boiling ink (`setFrame` with a nonzero frame)
-computes the noise live on every frame.
+computes the noise live on every frame, so `attach` only keeps it boiling
+where the page can afford it (see [`boil`](#filmattach)).
 
 Sizes are in CSS px, so small text looks softer than large text; lower
 `softness` for body copy. Browsers skip filters on zero-size elements: keep
@@ -333,7 +334,7 @@ emptiable editable elements from collapsing (e.g. with padding).
 ```ts
 film.attach(
   element: HTMLElement | SVGElement,
-  options?: { ink?: InkFilter | InkFilter[] },
+  options?: { ink?: InkFilter | InkFilter[]; boil?: boolean | "auto" },
 ): () => void
 ```
 
@@ -342,6 +343,29 @@ about the film frame's center), `filter` (the flicker, as `brightness()`),
 and, with `ink` (one filter or several), advances the ink's noise. It takes over `transform`,
 `transform-origin` and `filter`, so attach a wrapper, not the styled element
 itself. The returned function detaches it and clears those styles.
+
+| Option | Default  | Description                                                                  |
+| ------ | -------- | ---------------------------------------------------------------------------- |
+| `ink`  | none     | Ink filters used inside the element, whose noise boils each footage frame.  |
+| `boil` | `"auto"` | Whether the ink boils: `true`, `false` (it holds still) or `"auto"` (below). |
+
+Boiling redraws the ink's filters every footage frame, and Safari paints SVG
+filters on the CPU. Whether that fits in a frame depends on the device and the
+page: on an iPhone a boiling title can make every boil step a dropped frame,
+while desktop Safari drops about one in six and a page of boiling paragraphs
+costs nothing measurable on either. So with `"auto"` the ink boils from the
+start while `attach` watches the screen's frames (only while footage plays and
+the element is on screen). A boil step counts as late if any frame before the
+next step took over 1.25x the median frame. Once 16 of the last 24 steps (2 s
+at 12 fps) were late, the ink stops boiling and holds still for good; weave and
+flicker carry on. On phones this usually turns the boil off within about 2 s
+of it showing; on desktops it usually keeps boiling, and a brief stutter
+doesn't stop it. It decides once per `attach`, stores nothing, and its watching
+is a few arithmetic operations per frame, which stop once it turns the boil
+off. `true` and `false` don't watch.
+
+With `ink`, the element's `data-filmic-boil` attribute shows the boil's state:
+`"on"` or `"off"`.
 
 ### film.sync
 
